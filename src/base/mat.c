@@ -1,4 +1,4 @@
-#include <libio/PRINTF.h>
+#include <libio/console.h>
 #include "mat.h" 
 
 uint mat_get_dim(mat_t *m, uint axis) {

@@ -1,6 +1,6 @@
+#include <libalpaca/alpaca.h>
 #include "state.h"
 #include "mem.h"
-#include "alpaca.h"
 
 static __fram uint pos_bak;
 

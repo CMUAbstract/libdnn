@@ -2,7 +2,6 @@
 #define MAT_H
 
 #include "types.h"
-#include "misc.h"
 
 #define MAT_NUMARGS(...)  (sizeof((uint[]){__VA_ARGS__})/sizeof(uint))
 
@@ -40,11 +39,7 @@
 
 #define MAT_GET_DIM(m, axis) (mat_get_dim(m, axis))
 
-#ifndef INTERMITTENT
-	#define MAT_DUMP(m, w) (mat_dump(m, w))
-#else
-	#define MAT_DUMP(m, w) (0)
-#endif
+#define MAT_DUMP(m, w) (mat_dump(m, w))
 
 #define MAT_DEBUG_DUMP(m, v, d) (mat_debug_dump(m, v, d))
 

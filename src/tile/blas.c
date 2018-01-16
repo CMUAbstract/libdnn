@@ -1,14 +1,13 @@
 #include <string.h>
-#include <libio/PRINTF.h>
+#include <libio/console.h>
+#include <libalpaca/alpaca.h>
 
 #include "blas.h"
-#include "alpaca.h"
 #include "mem.h"
 #include "types.h"
 #include "state.h"
 #include "fixed.h"
 #include "mat.h"
-#include "misc.h"
 
 static __hifram fixed data1[MAX_MAT_SIZE];
 static __fram mat_t m;

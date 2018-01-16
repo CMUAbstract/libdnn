@@ -1,16 +1,15 @@
 #include <string.h>
 #include <msp430.h>
-#include <libio/PRINTF.h>
+#include <libio/console.h>
+#include <libalpaca/alpaca.h>
 
 #include "nn.h"
-#include "alpaca.h"
 #include "blas.h"
 #include "mem.h"
 #include "types.h"
 #include "state.h"
 #include "fixed.h"
 #include "mat.h"
-#include "misc.h"
 
 // BLAS Tasks
 TASK(TASK_UID_BLAS_OFFSET, task_init_blas);

@@ -1,6 +1,6 @@
 #ifndef BLAS_H
 #define BLAS_H
-#include "alpaca.h"
+#include <libalpaca/alpaca.h>
 
 #define TASK_UID_BLAS_OFFSET 10
 #define MAX_MAT_SIZE 0x240
