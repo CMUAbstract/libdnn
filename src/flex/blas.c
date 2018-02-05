@@ -308,6 +308,7 @@ void task_sm_mul() {
 		}
 		if(greater) k--; // Fix bug with idx % 255 == 0
 		k += MAT_GET(filter, pos);
+		if(k == 1) k--; // FIX
 		pos++;
 
 		scratch_bak[0] = pos;
@@ -394,6 +395,7 @@ void task_sm_conv() {
 		}
 		if(greater) idx--; // Fix bug with idx % 255 == 0
 		idx += MAT_GET(filter, pos);
+		if(idx == 1) idx--;
 		pos++;
 		scratch_bak[0] = idx;
 		scratch_bak[1] = pos;
