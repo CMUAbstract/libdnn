@@ -432,7 +432,7 @@ void task_sm_conv() { // TODO
 	if(CUR_INFO.scratch[1] < total_elements - 1) {
 		transition_to(CUR_TASK);
 	} else if(!(CUR_INFO.scratch[2] + tile_size_y == rows && 
-		CUR_INFO.scratch[3] + tile_size_x== cols)) {
+		CUR_INFO.scratch[3] + tile_size_x == cols)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 3);

@@ -70,7 +70,7 @@ void mat_dump(mat_t *m, uint which) {
 		for(uint j = 0; j < cols; j ++) {
 			PRINTF("%i ", MAT_GET(m, which, i, j));
 			if((j + 1) % cols == 0)
-				PRINTF("\r\n \r\n");
+				PRINTF("\r\n");
 		}
 	}
 	PRINTF("done ");
