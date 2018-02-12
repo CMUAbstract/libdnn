@@ -10,9 +10,9 @@
 #include "fixed.h"
 #include "mat.h"
 
-static DSPLIB_DATA(data1, 2) fixed tsrc1[MAX_TILE_SIZE];
-static DSPLIB_DATA(data2, 2) fixed tsrc2[MAX_TILE_SIZE];
-static DSPLIB_DATA(data3, 2) fixed tdest[MAX_TILE_SIZE];
+static DSPLIB_DATA(tsrc1, 2) fixed tsrc1[MAX_TILE_SIZE];
+static DSPLIB_DATA(tsrc2, 2) fixed tsrc2[MAX_TILE_SIZE];
+static DSPLIB_DATA(tdest, 2) fixed tdest[MAX_TILE_SIZE];
 static __fram fixed data[MAX_MAT_SIZE];
 static __fram fixed data2[MAX_MAT_SIZE];
 
@@ -26,11 +26,13 @@ static __fram uint scratch_bak[SCRATCH_SIZE];
 static __fram tile_size = 0;
 
 uint greatest_tile_size(uint a, uint max) {
-	uint i = 1;
+	if(a < max)
+		return max;
+	uint i = 2;
 	uint max_divisor = i;
 	while(i < max && i <= a) {
         if(a % i == 0) max_divisor = i;
-        i++;
+    	i += 2;
     }
     return max_divisor;
 }
@@ -83,6 +85,7 @@ void task_init_blas() {
 			msp_status status;
 			status = msp_mac_q15(&params, tsrc1, tsrc2, tdest);
 			msp_checkStatus(status);
+			PRINTF("\r\n DONE: %u", status);
 			write_to_gbuf((uint8_t *)(CUR_INFO.scratch + 1), (uint8_t *)(&tile_size), sizeof(uint));
 			transition_to(CUR_TASK);
 		}
@@ -142,15 +145,17 @@ void task_dm_add() {
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 	uint rows = MAT_GET_DIM(src, 0);
 	uint cols = MAT_GET_DIM(src, 1);
-	uint common_tile_size = greatest_tile_size(rows * cols, common_tile_size);
+	uint common_tile_size = greatest_tile_size(rows * cols, tile_size);
 	
+	msp_status status;
 	msp_add_q15_params params;
 	params.length = common_tile_size;
 	
 	for(uint i = CUR_INFO.scratch[0]; i < rows * cols; i = (CUR_INFO.scratch[0] += common_tile_size)) {
 		memcpy(tsrc1, src->data + CUR_INFO.scratch[0], sizeof(fixed) * common_tile_size);
 		memcpy(tsrc2, filter->data + CUR_INFO.scratch[0], sizeof(fixed) * common_tile_size);
-		msp_add_q15(&params, *tsrc1, *tsrc2, *tdest);
+		status = msp_add_q15(&params, tsrc1, tsrc2, tdest);
+		msp_checkStatus(status);
 		memcpy(dest->data + CUR_INFO.scratch[0], tdest, sizeof(fixed) * common_tile_size);
 	}
 
@@ -173,32 +178,37 @@ void task_dm_mul() {
 	msp_mac_q15_params params;
 	params.length = common_tile_size;
 
+	mat_t *inter_tmp = inter;
 	if(CUR_INFO.scratch[3] == 0) {
-		uint test = cols / common_tile_size * rows;
-		mat_t *tmp = dest;
-		dest = (test % 2 == 0) ? inter : dest;
-		inter = src;
-	} else if(CUR_INFO.scratch[3] == 1) {
-		src = inter;
-	} else {
-		src = dest;
-		dest = inter;
+		uint test = cols / common_tile_size;
+		if(test % 2 == 0) { // Swapped
+			mat_t *tmp = inter_tmp;
+			inter_tmp = dest;
+			dest = tmp;
+		}
+	} else if(CUR_INFO.scratch[3] == 2){ // Swapped
+		mat_t *tmp = inter_tmp;
+		inter_tmp = dest;
+		dest = tmp;
 	}
 
 	uint j = CUR_INFO.scratch[1];
 	for(uint i = CUR_INFO.scratch[0]; i < rows; i = ++CUR_INFO.scratch[0]) {
-		memcpy(tsrc1, filter + i * cols + j, sizeof(fixed) * common_tile_size);
+		memcpy(tsrc1, filter->data + i * cols + j, sizeof(fixed) * common_tile_size);
 		for(uint k = CUR_INFO.scratch[2]; k < dcols; k = ++CUR_INFO.scratch[2]) {
 			for(uint l = 0; l < common_tile_size; l++) {
 				tsrc2[l] = *(src->data + (j + l) * dcols + k); // strided memcpy
 			}
 			msp_mac_q15(&params, tsrc1, tsrc2, tdest);
-			fixed w = *tdest;
+			fixed w = ((*tdest >> 1) + F_K) >> F_N;
+			fixed tmp = w;
+
 			if(CUR_INFO.scratch[3] > 0) {
-				w = F_ADD(MAT_GET(dest, i, k), w);
+				w = F_ADD(MAT_GET(inter_tmp, i, k), w);
 			}
 			MAT_SET(dest, w, i, k);
 		}
+		CUR_INFO.scratch[2] = 0;
 	}
 
 	scratch_bak[0] = 0;
@@ -206,7 +216,7 @@ void task_dm_mul() {
 	scratch_bak[1] = CUR_INFO.scratch[1] + common_tile_size;
 	scratch_bak[3] = (CUR_INFO.scratch[3] == 2) ? 1 : 2;
 	if(CUR_INFO.scratch[3] == 0) {
-		uint test = cols / common_tile_size * rows;
+		uint test = cols / common_tile_size;
 		scratch_bak[3] = (test % 2 == 0) ? 1 : 2;
 	}
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
