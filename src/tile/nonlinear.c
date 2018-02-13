@@ -39,29 +39,29 @@ void task_pool() {
 	uint j = CUR_INFO.scratch[1];
 	uint k = CUR_INFO.scratch[2];
 	fixed max = MAT_GET(src, i, j, k);
-	for(uint l = 0; l < size; l ++) {
-		for(uint m = 0; m < size; m ++) {
+	for(uint l = 0; l < size[1]; l ++) {
+		for(uint m = 0; m < size[2]; m ++) {
 			fixed val = MAT_GET(src, i, j + l, k + m);
 			if(F_LT(max, val))
 				max = val;
 		}
 	}
-	MAT_SET(dest, max, i, j / stride, k / stride);
+	MAT_SET(dest, max, i, j / stride[1], k / stride[2]);
 	scratch_bak[0] = CUR_INFO.scratch[0];
 	scratch_bak[1] = CUR_INFO.scratch[1];
-	if(j + stride == rows && k + stride == cols) {
+	if(j + stride[1] == rows && k + stride[2] == cols) {
 		scratch_bak[0] = CUR_INFO.scratch[0] + 1;
 		scratch_bak[1] = 0;
-	} else if(k + stride == cols) {
-		scratch_bak[1] = CUR_INFO.scratch[1] + stride;
+	} else if(k + stride[1] == cols) {
+		scratch_bak[1] = CUR_INFO.scratch[1] + stride[1];
 	}
-	scratch_bak[2] = (k + stride == cols) ? 0 : CUR_INFO.scratch[2] + stride;
+	scratch_bak[2] = (k + stride[1] == cols) ? 0 : CUR_INFO.scratch[2] + stride[2];
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
 	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
 	if(!(CUR_INFO.scratch[0] + 1 == layers &&
-		 CUR_INFO.scratch[1] + stride == rows &&
-		 CUR_INFO.scratch[2] + stride == cols)) {
+		 CUR_INFO.scratch[1] + stride[1] == rows &&
+		 CUR_INFO.scratch[2] + stride[2] == cols)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 3);

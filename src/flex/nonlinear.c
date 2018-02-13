@@ -33,17 +33,17 @@ void task_pool() {
 	uint stride = MAT_GET(filter, 0);
 	uint size = MAT_GET(filter, 1);
 	for(uint i = CUR_INFO.scratch[0]; i < layers; i = ++CUR_INFO.scratch[0]) {
-		for(uint j = CUR_INFO.scratch[1]; j < rows; j = (CUR_INFO.scratch[1] += stride)) {
-			for(uint k = CUR_INFO.scratch[2]; k < rows; k = (CUR_INFO.scratch[2] += stride)) {
+		for(uint j = CUR_INFO.scratch[1]; j < rows; j = (CUR_INFO.scratch[1] += stride[1])) {
+			for(uint k = CUR_INFO.scratch[2]; k < rows; k = (CUR_INFO.scratch[2] += stride[2])) {
 				fixed max = MAT_GET(src, i, j, k);
-				for(uint l = 0; l < size; l ++) {
-					for(uint m = 0; m < size; m ++) {
+				for(uint l = 0; l < size[1]; l ++) {
+					for(uint m = 0; m < size[2]; m ++) {
 						fixed val = MAT_GET(src, i, j + l, k + m);
 						if(F_LT(max, val))
 							max = val;
 					}
 				}
-				MAT_SET(dest, max, i, j / stride, k / stride);
+				MAT_SET(dest, max, i, j / stride[1], k / stride[2]);
 			}
 			CUR_INFO.scratch[2] = 0;
 		}
