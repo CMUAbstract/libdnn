@@ -26,7 +26,6 @@ void task_cleanup_nonlinear() {
 void task_pool() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
 	uint layers = MAT_GET_DIM(src, 0);
 	uint rows = MAT_GET_DIM(src, 1);
@@ -64,7 +63,46 @@ void task_pool() {
 		 CUR_INFO.scratch[2] + stride[2] == cols)) {
 		transition_to(CUR_TASK);
 	}
-	POP_STACK(mat_stack, 3);
+	POP_STACK(mat_stack, 2);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_nonlinear);
+}
+
+void task_filter() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+
+	uint layers = MAT_GET_DIM(src, 0);
+	uint rows = MAT_GET_DIM(src, 1);
+	uint cols = MAT_GET_DIM(src, 2);
+
+	uint stride = MAT_GET(filter, 0);
+	uint size = MAT_GET(filter, 1);
+
+	uint i = CUR_INFO.scratch[0];
+	uint j = CUR_INFO.scratch[1];
+	uint k = CUR_INFO.scratch[2];
+
+	fixed w = MAT_GET(src, i, j, k);
+	MAT_SET(dest, w, i / stride[0], j / stride[1], k / stride[2]);
+	scratch_bak[0] = CUR_INFO.scratch[0];
+	scratch_bak[1] = CUR_INFO.scratch[1];
+	if(j + stride[1] == rows && k + stride[2] == cols) {
+		scratch_bak[0] = CUR_INFO.scratch[0] + stride[0];
+		scratch_bak[1] = 0;
+	} else if(k + stride[1] == cols) {
+		scratch_bak[1] = CUR_INFO.scratch[1] + stride[1];
+	}
+	scratch_bak[2] = (k + stride[1] == cols) ? 0 : CUR_INFO.scratch[2] + stride[2];
+	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
+	if(!(CUR_INFO.scratch[0] + stride[0] == layers &&
+		 CUR_INFO.scratch[1] + stride[1] == rows &&
+		 CUR_INFO.scratch[2] + stride[2] == cols)) {
+		transition_to(CUR_TASK);
+	}
+	POP_STACK(mat_stack, 2);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_nonlinear);
 }

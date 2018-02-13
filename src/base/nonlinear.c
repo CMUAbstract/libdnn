@@ -51,6 +51,25 @@ void task_pool() {
 	TRANSITION_TO(task_cleanup_nonlinear);
 }
 
+void task_filter() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	uint layers = MAT_GET_DIM(src, 0);
+	uint rows = MAT_GET_DIM(src, 1);
+	uint cols = MAT_GET_DIM(src, 2);
+	for(uint i = 0; i < layers; i += stride[0]) {
+		for(uint j = 0; j < rows; j += stride[1]) {
+			for(uint k = 0; k < cols; k += stride[2]) {
+				fixed w = MAT_GET(src, i, j, k);
+				MAT_SET(dest, w, i / stride[0], j / stride[1], k / stride[2]);
+			}
+		}
+	}
+	POP_STACK(mat_stack, 2);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_nonlinear);
+}
+
 void task_relu() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);

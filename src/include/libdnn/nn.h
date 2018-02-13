@@ -17,4 +17,6 @@ void task_d_fc();
 void task_s_fc();
 void task_pool();
 void task_relu();
+void task_filter();
+
 #endif
