@@ -1,6 +1,11 @@
 LIB = libdnn
 
-OBJECTS = blas.o mat.o nn.o state.o
+include ../Makefile.config
+OBJECTS = mat.o nn.o state.o \
+			$(LIBDNN_BACKEND)/nonlinear.o \
+			$(LIBDNN_BACKEND)/blas.o 
+
+$(info $(OBJECTS))
 
 DEPS += libio libalpaca
 
@@ -9,6 +14,3 @@ override SRC_ROOT = ../../src
 override CFLAGS += \
 	-I../../src/include \
 	-I../../src/include/$(LIB)
-
-include ../Makefile.config
-override SRC_ROOT = ../../src/$(LIBDNN_BACKEND)

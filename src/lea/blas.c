@@ -26,8 +26,8 @@ static __fram uint scratch_bak[SCRATCH_SIZE];
 static __fram tile_size = 0;
 
 uint greatest_tile_size(uint a, uint max) {
-	if(a < max)
-		return max;
+	if(a < max) return a + (a % 2); // Special case when max > a
+
 	uint i = 2;
 	uint max_divisor = i;
 	while(i < max && i <= a) {
@@ -201,7 +201,6 @@ void task_dm_mul() {
 			}
 			msp_mac_q15(&params, tsrc1, tsrc2, tdest);
 			fixed w = ((*tdest >> 1) + F_K) >> F_N;
-			fixed tmp = w;
 
 			if(CUR_INFO.scratch[3] > 0) {
 				w = F_ADD(MAT_GET(inter_tmp, i, k), w);
@@ -249,29 +248,36 @@ void task_dm_conv() {
 	msp_mac_q15_params params;
 	params.length = common_tile_size;
 
+	mat_t *inter_tmp = inter;
 	if(CUR_INFO.scratch[4] == 0) {
-		uint test = fcols / common_tile_size * frows * flayers;
-		mat_t *tmp = dest;
-		dest = (test % 2 == 0) ? inter : dest;
-		inter = src;
-	} else if(CUR_INFO.scratch[4] == 1) {
-		src = inter;
-	} else {
-		src = dest;
-		dest = inter;
+		uint test = fcols / common_tile_size;
+		if(test % 2 == 0) { // Swapped
+			mat_t *tmp = inter_tmp;
+			inter_tmp = dest;
+			dest = tmp;
+		}
+	} else if(CUR_INFO.scratch[4] == 2){ // Swapped
+		mat_t *tmp = inter_tmp;
+		inter_tmp = dest;
+		dest = tmp;
 	}
 
-	memcpy(tsrc1, filter->data + CUR_INFO.scratch[3], 
-		sizeof(fixed) * common_tile_size);
+	memcpy(tsrc1, filter->data + CUR_INFO.scratch[3], sizeof(fixed) * common_tile_size);
+	if(common_tile_size > fcols) {
+		/* We have to zero an extra element for this case
+		Basically, fcols was smaller than max tile size and was odd
+		*/
+		tsrc1[common_tile_size - 1] = 0;
+	}
 	uint offset = CUR_INFO.scratch[0] * rows * cols + CUR_INFO.scratch[1] * cols 
 		+ CUR_INFO.scratch[2];
 	for(uint i = CUR_INFO.scratch[1]; i < rows; i = ++CUR_INFO.scratch[1]) {
 		for(uint j = CUR_INFO.scratch[2]; j < cols; j = ++CUR_INFO.scratch[2]) {
-			memcpy(tsrc2, (inter->data + offset), sizeof(fixed) * common_tile_size);
+			memcpy(tsrc2, (src->data + offset), sizeof(fixed) * common_tile_size);
 			msp_mac_q15(&params, tsrc1, tsrc2, tdest);
-			fixed w = *tdest;
+			fixed w = ((*tdest >> 1) + F_K) >> F_N;
 			if(CUR_INFO.scratch[4] > 0) {
-				w = F_ADD(MAT_GET(inter, i, j), w);
+				w = F_ADD(MAT_GET(inter_tmp, i, j), w);
 			}
 			MAT_SET(dest, w, i, j);
 			offset++;
@@ -289,7 +295,7 @@ void task_dm_conv() {
 	}
 	scratch_bak[4] = (CUR_INFO.scratch[4] == 2) ? 1 : 2;
 	if(CUR_INFO.scratch[4] == 0) {
-		uint test = fcols / common_tile_size * frows * flayers;
+		uint test = fcols / common_tile_size;
 		scratch_bak[4] = (test % 2 == 0) ? 1 : 2;
 	}
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
