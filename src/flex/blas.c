@@ -239,7 +239,7 @@ void task_sm_mul() {
 	}
 
 	mat_t *tmp = dest;
-	if(total_elements % 2 == 0 && pos % 2 == 1) { // A
+	if(total_elements % 2 == 0 && pos % 2 == 0) { // A
 		dest = inter;
 		inter = tmp;
 	} else if(total_elements % 2 == 1 && pos % 2 == 1) { // B
