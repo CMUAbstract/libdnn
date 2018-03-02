@@ -16,8 +16,8 @@
 // Commented out for the sake of int arithmetic to work
 static inline fixed f_mul(fixed a, fixed b) {
     signed int tmp = a * b;
-    tmp += F_K;
-    tmp >>= F_N;
+    // tmp += F_K;
+    // tmp >>= F_N;
     return (fixed)tmp;
 };
 

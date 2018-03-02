@@ -25,16 +25,18 @@ mat_t mat_constrain(mat_t *m, uint len, uint idxs[]) {
 	uint j = 0;
 	for(uint i = len; i < m->len_dims; i++) {
 		c_m.dims[j] = m->dims[i];
-		c_m.sparse_dims[j] = m->sparse_dims[i]; // DO SOMETHING BETTER HERE
+		c_m.sparse.dims[j] = m->sparse.dims[i];
 		j++;
 	}
 	j = 0;
 	for(uint i = len; i < 10; i++) {
-		c_m.sparse_dims[j] = m->sparse_dims[i]; // DO SOMETHING BETTER HERE
+		c_m.sparse.dims[j] = m->sparse.dims[i];
 		j++;
 	}
 	c_m.len_dims = m->len_dims - len;
 	c_m.data = m->data + offset;
+	c_m.sparse.offsets = m->sparse.offsets + offset;
+	c_m.sparse.sizes = m->sparse.sizes;
 	return c_m;
 }
 

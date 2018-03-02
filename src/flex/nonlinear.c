@@ -29,8 +29,6 @@ void task_pool() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	uint layers = MAT_GET_DIM(src, 0);
 	uint rows = MAT_GET_DIM(src, 1);
-	uint stride = MAT_GET(filter, 0);
-	uint size = MAT_GET(filter, 1);
 	for(uint i = CUR_INFO.scratch[0]; i < layers; i = ++CUR_INFO.scratch[0]) {
 		for(uint j = CUR_INFO.scratch[1]; j < rows; j = (CUR_INFO.scratch[1] += stride[1])) {
 			for(uint k = CUR_INFO.scratch[2]; k < rows; k = (CUR_INFO.scratch[2] += stride[2])) {

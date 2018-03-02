@@ -1,0 +1,12 @@
+# This makefile applies the options.
+# For list of options and documentation see Makefile.config
+
+ifneq ($LIBDNN_INTERMITTENT,)
+override CFLAGS += -DCONFIG_INTERMITTENT=1
+endif
+
+ifneq ($LIBDNN_BITWIDTH,)
+override CFLAGS += -DCONFIG_BITWIDTH=$(LIBDNN_BITWIDTH)
+endif
+
+override CFLAGS += -DCONFIG_TILE_SIZE=$(LIBDNN_TILE_SIZE)

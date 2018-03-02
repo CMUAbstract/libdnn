@@ -150,8 +150,9 @@ void task_dm_conv() {
 	TRANSITION_TO(task_cleanup_blas);
 }
 
-/*
+
 void task_dm_conv1d() {
+#if 0
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
@@ -159,34 +160,37 @@ void task_dm_conv1d() {
 	uint rows = MAT_GET_DIM(dest, 0);
 	uint cols = MAT_GET_DIM(dest, 1);
 
-	uint flayers = MAT_GET_DIM(filter, 0);
-	uint frows = MAT_GET_DIM(filter, 1);
-	uint fcols = MAT_GET_DIM(filter, 2);
-	for(uint k = 0; k < flayers; k++) {
-		for(uint l = 0; l < frows; l++) {
-			for(uint n = 0; n < fcols; n++) {
-				for(uint i = 0; i < rows; i++) {
-					for(uint j = 0; j < cols; j++) {
-						fixed w = F_MUL(MAT_GET(filter, k, l, n), MAT_GET(src, k, i + l, j + n));
-						if(k == 0 && l == 0 && n == 0) { // Zero
-							MAT_SET(dest, w, i, j);
-							continue;
-						}
-						w = F_ADD(w, MAT_GET(dest, i, j));
-						MAT_SET(dest, w, i, j);
-					}
-				}
+	uint total_elements = MAT_GET_DIM(filter, 0);
+	uint frows = filter->sparse.dims[1];
+	uint fcols = filter->sparse.dims[2];
+	
+	uint k = 0;
+	uint l = 0;
+	uint n = 0;
+	char zero = 1;
+	for(uint pos = 0; pos < total_elements; pos++) {
+		fixed f = MAT_GET(filter, pos);
+		for(uint i = 0; i < rows; i++) {
+			for(uint j = 0; j < cols; j++) {
+				fixed w = F_MUL(f, MAT_GET(src, k, i + l, j + n));
+				w = (zero) ? w : F_ADD(w, MAT_GET(dest, i, j)); // Zero
+				MAT_SET(dest, w, i, j);
 			}
 		}
+		zero = 0;
+		k += stride[0];
+		l += stride[1];
+		n += stride[2];
 	}
 
 	POP_STACK(mat_stack, 3);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_blas);
-}*/
+#endif
+}
 
 // Sparse matrix multiplication
-void task_sm_mul() { // NEED TO ZERO !!
+void task_sm_mul() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
@@ -198,38 +202,23 @@ void task_sm_mul() { // NEED TO ZERO !!
 	uint pos = 0;
 	uint i = 0;
 	uint k = 0;
-	char greater = 0;
-	while(MAT_GET(filter, pos) == 0) { // Calculate next pos
-		greater = 1;
-		k += 255;
-		pos++;
-	}
-	if(greater) k--; // Fix bug with idx % 255 == 0
-	k += MAT_GET(filter, pos);
-	if(k == 1) k--; // FIX
+	char zero = 1;
 
-	i /= cols;
-	k %= cols;
-
-	pos++;
 	while(pos < total_elements) {
+		k += filter->sparse.offsets[pos];
+		if(k / cols > 0) zero = 1;
+		i += k / cols;
+		k %= cols;
+		PRINTF("\r\n i: %u k: %u pos: %u val: %i", i, k, pos, MAT_GET(filter, pos));
 		for(uint j = 0; j < dcols; j++) {
 			fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, j));
-			w = F_ADD(w, MAT_GET(dest, i, j));
+			if(!zero) {
+				w = F_ADD(w, MAT_GET(dest, i, j));
+			}
 			MAT_SET(dest, w, i, j);
 		}
-		char greater = 0;
-		while(MAT_GET(filter, pos + 1) == 0) { // Calculate next pos
-			greater = 1;
-			k += 255;
-			pos++;
-		}
-		if(greater) k--; // Fix bug with idx % 255 == 0
 		pos++;
-		k += MAT_GET(filter, pos);
-		pos++;
-		i = i + k / cols;
-		k %= cols;
+		zero = 0;
 	}
 
 	POP_STACK(mat_stack, 3);
@@ -244,27 +233,19 @@ void task_sm_conv() {
 
 	uint rows = MAT_GET_DIM(dest, 0);
 	uint cols = MAT_GET_DIM(dest, 1);
-	uint frows = filter->sparse_dims[1];
-	uint fcols = filter->sparse_dims[2];
+	uint frows = filter->sparse.dims[1];
+	uint fcols = filter->sparse.dims[2];
 	uint total_elements = MAT_GET_DIM(filter, 0);
 
 	uint idx = 0;
 	uint pos = 0;
 	char zero = 1;
-	char greater = 0;
-	while(MAT_GET(filter, pos) == 0) { // Calculate next pos
-		greater = 1;
-		idx += 255;
-		pos++;
-	}
-	if(greater) idx--; // Fix bug with idx % 255 == 0
-	idx += MAT_GET(filter, pos);
-	if(idx == 1) idx--;
-	pos++;	
 	while(pos < total_elements) {
+		idx += filter->sparse.offsets[pos];
 		uint k = idx / (fcols * frows); // Layers
 		uint l = (idx % (fcols * frows)) / fcols; // Rows
 		uint n = idx % fcols; // Cols
+		PRINTF("\r\n k: %u l: %u n: %u idx: %u pos: %u val: %i", k, l, n, idx, pos, MAT_GET(filter, pos));
 		for(uint i = 0; i < rows; i++) {
 			for(uint j = 0; j < cols; j++) {
 				fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
@@ -273,15 +254,6 @@ void task_sm_conv() {
 			}
 		}
 		zero = 0;
-		char greater = 0;
-		while(MAT_GET(filter, pos + 1) == 0) { // Calculate next pos
-			greater = 1;
-			idx += 255;
-			pos++;
-		}
-		if(greater) idx--; // Fix bug with idx % 255 == 0
-		pos++;
-		idx += MAT_GET(filter, pos);
 		pos++;
 	}
 	POP_STACK(mat_stack, 3);

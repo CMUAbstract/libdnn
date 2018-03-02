@@ -31,9 +31,6 @@ void task_pool() {
 	uint rows = MAT_GET_DIM(src, 1);
 	uint cols = MAT_GET_DIM(src, 2);
 
-	uint stride = MAT_GET(filter, 0);
-	uint size = MAT_GET(filter, 1);
-
 	uint i = CUR_INFO.scratch[0];
 	uint j = CUR_INFO.scratch[1];
 	uint k = CUR_INFO.scratch[2];
@@ -75,9 +72,6 @@ void task_filter() {
 	uint layers = MAT_GET_DIM(src, 0);
 	uint rows = MAT_GET_DIM(src, 1);
 	uint cols = MAT_GET_DIM(src, 2);
-
-	uint stride = MAT_GET(filter, 0);
-	uint size = MAT_GET(filter, 1);
 
 	uint i = CUR_INFO.scratch[0];
 	uint j = CUR_INFO.scratch[1];

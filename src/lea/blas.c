@@ -60,7 +60,7 @@ void task_init_blas() {
 		inter2->data = data2;
 		CUR_INFO.scratch[1] = MAX_TILE_SIZE;
 		CUR_INFO.scratch[0] = 1;
-#ifdef INTERMITTENT
+#ifdef CONFIG_INTERMITTENT
 		while(1) {}
 #else
 		transition_to(CUR_TASK);
@@ -70,7 +70,7 @@ void task_init_blas() {
 	if(CUR_INFO.scratch[0] == 3) {
 		PRINTF("\r\n Waiting to die");
 		CUR_INFO.scratch[0] = 1;
-#ifdef INTERMITTENT
+#ifdef CONFIG_INTERMITTENT
 		while(1) {}
 #else
 		transition_to(CUR_TASK);
@@ -200,8 +200,9 @@ void task_dm_mul() {
 				tsrc2[l] = *(src->data + (j + l) * dcols + k); // strided memcpy
 			}
 			msp_mac_q15(&params, tsrc1, tsrc2, tdest);
+#if 0
 			fixed w = ((*tdest >> 1) + F_K) >> F_N;
-
+#endif
 			if(CUR_INFO.scratch[3] > 0) {
 				w = F_ADD(MAT_GET(inter_tmp, i, k), w);
 			}
@@ -313,6 +314,10 @@ void task_dm_conv() {
 	TRANSITION_TO(task_cleanup_blas);
 }
 
+void task_dm_conv1d() {
+	#pragma GCC warning "Not yet implemented"
+}
+
 // Sparse matrix multiplication
 void task_sm_mul() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
@@ -328,15 +333,7 @@ void task_sm_mul() {
 	uint i = CUR_INFO.scratch[1];
 	uint k = CUR_INFO.scratch[2];
 	if(pos == 0) {
-		char greater = 0;
-		while(MAT_GET(filter, pos) == 0) { // Calculate next pos
-			greater = 1;
-			k += 255;
-			pos++;
-		}
-		if(greater) k--; // Fix bug with idx % 255 == 0
-		k += MAT_GET(filter, pos);
-		if(k == 1) k--; // FIX
+		k += filter->sparse.offsets[pos];
 		pos++;
 
 		scratch_bak[0] = pos;
@@ -370,15 +367,7 @@ void task_sm_mul_addr() {
 	uint i = sm_mul->info.scratch[1];
 	uint k = sm_mul->info.scratch[2];
 
-	char greater = 0;
-	while(MAT_GET(filter, pos + 1) == 0) { // Calculate next pos
-		greater = 1;
-		k += 255;
-		pos++;
-	}
-	if(greater) k--; // Fix bug with idx % 255 == 0
-	pos++;
-	k += MAT_GET(filter, pos);
+	k += filter->sparse.offsets[pos];
 	pos++;
 
 	scratch_bak[0] = pos;
@@ -434,7 +423,6 @@ void task_sm_conv() {
 		}
 		if(greater) idx--; // Fix bug with idx % 255 == 0
 		idx += MAT_GET(filter, pos);
-		if(idx == 1) idx--;
 		pos++;
 		coalesced_filter[idx % common_tile_size] = MAT_GET(filter, pos);
 		scratch_bak[0] = idx;
@@ -566,15 +554,7 @@ void task_sm_conv() {
 	uint l = (idx % (fcols * frows)) / fcols; // Rows
 	uint n = idx % fcols; // Cols
 	if(pos == 0) {
-		char greater = 0;
-		while(MAT_GET(filter, pos) == 0) { // Calculate next pos, idx
-			greater = 1;
-			idx += 255;
-			pos++;
-		}
-		if(greater) idx--; // Fix bug with idx % 255 == 0
-		idx += MAT_GET(filter, pos);
-		if(idx == 1) idx--;
+		idx += filter->sparse.offsets[pos];
 		pos++;
 		scratch_bak[0] = idx;
 		scratch_bak[1] = pos;
@@ -612,16 +592,9 @@ void task_sm_conv() {
 		}
 	}
 
-	char greater = 0;
-	while(MAT_GET(filter, pos + 1) == 0) { // Calculate next pos, idx
-		greater = 1;
-		idx += 255;
-		pos++;
-	}
-	if(greater) idx--; // Fix bug with idx % 255 == 0
+	idx += filter->sparse.offsets[pos];
 	pos++;
-	idx += MAT_GET(filter, pos);
-	pos++;
+	
 	scratch_bak[0] = idx;
 	scratch_bak[1] = pos;
 	scratch_bak[2] = 0;

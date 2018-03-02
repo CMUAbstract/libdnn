@@ -1,6 +1,5 @@
 LIB = libdnn
 
-include ../Makefile.config
 OBJECTS = mat.o nn.o state.o \
 			$(LIBDNN_BACKEND)/nonlinear.o \
 			$(LIBDNN_BACKEND)/blas.o 
