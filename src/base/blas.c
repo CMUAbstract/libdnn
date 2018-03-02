@@ -209,7 +209,7 @@ void task_sm_mul() {
 		if(k / cols > 0) zero = 1;
 		i += k / cols;
 		k %= cols;
-		PRINTF("\r\n i: %u k: %u pos: %u val: %i", i, k, pos, MAT_GET(filter, pos));
+		// PRINTF("\r\n i: %u k: %u pos: %u val: %i", i, k, pos, MAT_GET(filter, pos));
 		for(uint j = 0; j < dcols; j++) {
 			fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, j));
 			if(!zero) {
@@ -245,7 +245,7 @@ void task_sm_conv() {
 		uint k = idx / (fcols * frows); // Layers
 		uint l = (idx % (fcols * frows)) / fcols; // Rows
 		uint n = idx % fcols; // Cols
-		PRINTF("\r\n k: %u l: %u n: %u idx: %u pos: %u val: %i", k, l, n, idx, pos, MAT_GET(filter, pos));
+		// PRINTF("\r\n k: %u l: %u n: %u idx: %u pos: %u val: %i", k, l, n, idx, pos, MAT_GET(filter, pos));
 		for(uint i = 0; i < rows; i++) {
 			for(uint j = 0; j < cols; j++) {
 				fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
