@@ -9,6 +9,7 @@
 #include "state.h"
 #include "fixed.h"
 #include "mat.h"
+#include "misc.h"
 
 static __fram uint scratch_bak[SCRATCH_SIZE];
 

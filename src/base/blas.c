@@ -8,6 +8,7 @@
 #include "state.h"
 #include "fixed.h"
 #include "mat.h"
+#include "misc.h"
 
 static __hifram fixed data1[MAX_MAT_SIZE];
 static __hifram fixed data2[MAX_MAT_SIZE];
@@ -15,8 +16,6 @@ static __fram mat_t m1;
 static __fram mat_t m2;
 static __fram mat_t *inter1;
 static __fram mat_t *inter2;
-
-static __fram uint scratch_bak[SCRATCH_SIZE];
 
 void task_cleanup_blas();
 TASK(TASK_UID_BLAS_OFFSET + 8, task_cleanup_blas);
@@ -148,45 +147,6 @@ void task_dm_conv() {
 	POP_STACK(mat_stack, 3);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_blas);
-}
-
-
-void task_dm_conv1d() {
-#if 0
-	mat_t *src = PEEK_STACK(mat_stack, 0);
-	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	mat_t *filter = PEEK_STACK(mat_stack, 2);
-
-	uint rows = MAT_GET_DIM(dest, 0);
-	uint cols = MAT_GET_DIM(dest, 1);
-
-	uint total_elements = MAT_GET_DIM(filter, 0);
-	uint frows = filter->sparse.dims[1];
-	uint fcols = filter->sparse.dims[2];
-	
-	uint k = 0;
-	uint l = 0;
-	uint n = 0;
-	char zero = 1;
-	for(uint pos = 0; pos < total_elements; pos++) {
-		fixed f = MAT_GET(filter, pos);
-		for(uint i = 0; i < rows; i++) {
-			for(uint j = 0; j < cols; j++) {
-				fixed w = F_MUL(f, MAT_GET(src, k, i + l, j + n));
-				w = (zero) ? w : F_ADD(w, MAT_GET(dest, i, j)); // Zero
-				MAT_SET(dest, w, i, j);
-			}
-		}
-		zero = 0;
-		k += stride[0];
-		l += stride[1];
-		n += stride[2];
-	}
-
-	POP_STACK(mat_stack, 3);
-	last_task = CUR_TASK;
-	TRANSITION_TO(task_cleanup_blas);
-#endif
 }
 
 // Sparse matrix multiplication

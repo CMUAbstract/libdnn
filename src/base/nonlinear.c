@@ -10,8 +10,7 @@
 #include "state.h"
 #include "fixed.h"
 #include "mat.h"
-
-static __fram uint scratch_bak[SCRATCH_SIZE];
+#include "misc.h"
 
 void task_cleanup_nonlinear();
 TASK(TASK_UID_BLAS_OFFSET + 8, task_cleanup_nonlinear);

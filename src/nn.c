@@ -10,6 +10,7 @@
 #include "state.h"
 #include "fixed.h"
 #include "mat.h"
+#include "misc.h"
 
 // BLAS Tasks
 TASK(TASK_UID_BLAS_OFFSET, task_init_blas);

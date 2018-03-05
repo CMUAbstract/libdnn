@@ -1,5 +1,6 @@
 #include <libio/console.h>
 #include "mat.h" 
+#include "misc.h"
 
 uint mat_get_dim(mat_t *m, uint axis) {
 	return m->dims[axis];

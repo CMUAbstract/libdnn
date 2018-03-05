@@ -39,9 +39,13 @@
 
 #define MAT_GET_DIM(m, axis) (mat_get_dim(m, axis))
 
-#define MAT_DUMP(m, w) (mat_dump(m, w))
-
-#define MAT_DEBUG_DUMP(m, v, d) (mat_debug_dump(m, v, d))
+#ifdef CONFIG_CONSOLE
+	#define MAT_DUMP(m, w) (mat_dump(m, w))
+	#define MAT_DEBUG_DUMP(m, v, d) (mat_debug_dump(m, v, d))
+#else
+	#define MAT_DUMP(m, w) (0)
+	#define MAT_DEBUG_DUMP(m, v, d) (0)
+#endif
 
 uint mat_get_dim(mat_t *, uint axis);
 

@@ -5,6 +5,7 @@ OBJECTS = mat.o nn.o state.o \
 			$(LIBDNN_BACKEND)/blas.o 
 
 $(info $(OBJECTS))
+$(info $(CFLAGS))
 
 DEPS += libio libalpaca
 

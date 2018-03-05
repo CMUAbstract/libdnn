@@ -8,6 +8,7 @@
 #include "state.h"
 #include "fixed.h"
 #include "mat.h"
+#include "misc.h"
 
 static __hifram fixed data1[MAX_MAT_SIZE];
 static __hifram fixed data2[MAX_MAT_SIZE];
