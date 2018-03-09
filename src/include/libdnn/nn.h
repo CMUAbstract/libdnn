@@ -6,6 +6,7 @@
 #define MAX_LAYER_SIZE 0x3000
 #define TASK_UID_NN_OFFSET 20
 
+extern bool same_padding;
 extern uint stride[3];
 extern uint size[3];
 

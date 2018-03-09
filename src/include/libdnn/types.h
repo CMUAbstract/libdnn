@@ -24,4 +24,9 @@ typedef struct {
 	} sparse;
 } mat_t;
 
+typedef enum {
+	false,
+	true,
+} bool;
+
 #endif

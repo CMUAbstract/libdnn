@@ -149,6 +149,44 @@ void task_dm_conv() {
 	TRANSITION_TO(task_cleanup_blas);
 }
 
+// Dense matrix convolution, same padding
+void task_dm_conv_same() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+
+	uint rows = MAT_GET_DIM(dest, 0);
+	uint cols = MAT_GET_DIM(dest, 1);
+
+	uint flayers = MAT_GET_DIM(filter, 0);
+	uint frows = MAT_GET_DIM(filter, 1);
+	uint fcols = MAT_GET_DIM(filter, 2);
+	for(uint k = 0; k < flayers; k++) {
+		for(uint l = 0; l < frows; l++) {
+			for(uint n = 0; n < fcols; n++) {
+				for(uint i = 0; i < rows; i++) {
+					for(uint j = 0; j < cols; j++) {
+						fixed w = F_MUL(MAT_GET(filter, k, l, n), MAT_GET(src, k, i + l, j + n));
+						if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {
+							w = 0;
+						}
+						if(k == 0 && l == 0 && n == 0) { // Zero
+							MAT_SET(dest, w, i, j);
+							continue;
+						}
+						w = F_ADD(w, MAT_GET(dest, i, j));
+						MAT_SET(dest, w, i, j);
+					}
+				}
+			}
+		}
+	}
+
+	POP_STACK(mat_stack, 3);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_blas);
+}
+
 // Sparse matrix multiplication
 void task_sm_mul() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
@@ -209,6 +247,44 @@ void task_sm_conv() {
 		for(uint i = 0; i < rows; i++) {
 			for(uint j = 0; j < cols; j++) {
 				fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
+				w = (zero) ? w : F_ADD(w, MAT_GET(dest, i, j)); // Zero
+				MAT_SET(dest, w, i, j);
+			}
+		}
+		zero = 0;
+		pos++;
+	}
+	POP_STACK(mat_stack, 3);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_blas);
+}
+
+void task_sm_conv_same() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+
+	uint rows = MAT_GET_DIM(dest, 0);
+	uint cols = MAT_GET_DIM(dest, 1);
+	uint frows = filter->sparse.dims[1];
+	uint fcols = filter->sparse.dims[2];
+	uint total_elements = MAT_GET_DIM(filter, 0);
+
+	uint idx = 0;
+	uint pos = 0;
+	char zero = 1;
+	while(pos < total_elements) {
+		idx += filter->sparse.offsets[pos];
+		uint k = idx / (fcols * frows); // Layers
+		uint l = (idx % (fcols * frows)) / fcols; // Rows
+		uint n = idx % fcols; // Cols
+		// PRINTF("\r\n k: %u l: %u n: %u idx: %u pos: %u val: %i", k, l, n, idx, pos, MAT_GET(filter, pos));
+		for(uint i = 0; i < rows; i++) {
+			for(uint j = 0; j < cols; j++) {
+				fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
+				if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {
+					w = 0;
+				}
 				w = (zero) ? w : F_ADD(w, MAT_GET(dest, i, j)); // Zero
 				MAT_SET(dest, w, i, j);
 			}

@@ -19,8 +19,10 @@ TASK(TASK_UID_BLAS_OFFSET + 2, task_ds_add);
 TASK(TASK_UID_BLAS_OFFSET + 3, task_dm_add);
 TASK(TASK_UID_BLAS_OFFSET + 4, task_dm_mul);
 TASK(TASK_UID_BLAS_OFFSET + 5, task_dm_conv);
-TASK(TASK_UID_BLAS_OFFSET + 6, task_sm_mul);
-TASK(TASK_UID_BLAS_OFFSET + 7, task_sm_conv);
+TASK(TASK_UID_BLAS_OFFSET + 6, task_dm_conv_same);
+TASK(TASK_UID_BLAS_OFFSET + 7, task_sm_mul);
+TASK(TASK_UID_BLAS_OFFSET + 8, task_sm_conv);
+TASK(TASK_UID_BLAS_OFFSET + 9, task_sm_conv_same);
 
 static __hifram fixed data[MAX_LAYER_SIZE];
 static __fram mat_t m;
@@ -60,18 +62,22 @@ void task_d_conv() {
 	mat_t *b = PEEK_STACK(mat_stack, 3);
 	mat_reshape(inter, dest->len_dims, dest->dims);
 	uint filters = MAT_GET_DIM(w, 0);
+	task_t *target = TASK_REF(task_sm_conv);
+	if(same_padding) {
+		target = TASK_REF(task_sm_conv_same);
+	}
 	if(CUR_INFO.scratch[0] == 0) { // Do convolution on all filters
 		uint i = CUR_INFO.scratch[1];
 		PRINTF("\r\n    Convolving %u", i);
 		if(i < filters) {
-			TASK_REF(task_dm_conv)->info.return_task = CUR_TASK;
+			target->info.return_task = CUR_TASK;
 			// Assumes filter, dest, src in that order
 			c_inter = MAT_CONSTRAIN(inter, i);
 			c_filter = MAT_CONSTRAIN(w, i);
 			PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
 			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
-			TRANSITION_TO(task_dm_conv);
+			transition_to(target);
 		}
 		scratch_bak[0] = 1;	
 		scratch_bak[1] = 0;	
@@ -156,13 +162,17 @@ void task_s_conv() {
 	mat_t *b = PEEK_STACK(mat_stack, 3);
 	mat_reshape(inter, dest->len_dims, dest->dims);
 	uint filters = w->sparse.dims[0];
+	task_t *target = TASK_REF(task_sm_conv);
+	if(same_padding) {
+		target = TASK_REF(task_sm_conv_same);
+	}
 	if(CUR_INFO.scratch[0] == 0) { // Sparse Convolve
 		uint i = CUR_INFO.scratch[1];
 		uint running_size = CUR_INFO.scratch[2];
 		if(i < filters) {
 			if(w->sparse.sizes[i] > 0) {
 				PRINTF("\r\n     Convolving %u %u %u", i, running_size, w->sparse.sizes[i]);
-				TASK_REF(task_sm_conv)->info.return_task = CUR_TASK;
+				target->info.return_task = CUR_TASK;
 				// Assumes filter, dest, src in that order
 				c_filter = MAT_CONSTRAIN(w, running_size);
 				c_filter.dims[0] = w->sparse.sizes[i];
@@ -172,7 +182,7 @@ void task_s_conv() {
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
 				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
-				TRANSITION_TO(task_sm_conv);
+				transition_to(target);
 			}
 			PRINTF("\r\n     Zeroing %u", i);
 			TASK_REF(task_ds_zero)->info.return_task = CUR_TASK;

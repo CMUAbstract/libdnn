@@ -41,11 +41,11 @@
 
 #ifdef CONFIG_CONSOLE
 	#define MAT_DUMP(m, w) (mat_dump(m, w))
-	#define MAT_DEBUG_DUMP(m, v, d) (mat_debug_dump(m, v, d))
 #else
 	#define MAT_DUMP(m, w) (0)
-	#define MAT_DEBUG_DUMP(m, v, d) (0)
 #endif
+
+#define MAT_DEBUG_DUMP(m, v, d) (mat_debug_dump(m, v, d))
 
 uint mat_get_dim(mat_t *, uint axis);
 
