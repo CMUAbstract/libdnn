@@ -6,39 +6,39 @@
 #include "mem.h"
 #include "types.h"
 #include "state.h"
+#include "buffer.h"
 #include "fixed.h"
 #include "mat.h"
 #include "misc.h"
 
-static __hifram fixed data1[MAX_MAT_SIZE];
-static __hifram fixed data2[MAX_MAT_SIZE];
-static __fram mat_t m1;
-static __fram mat_t m2;
-static __fram mat_t *inter1;
-static __fram mat_t *inter2;
-
+static __fram mat_t m1 = {.data = mat_buffers[0]};
+static __fram mat_t m2 = {.data = mat_buffers[1]};
+static __fram mat_t *inter1 = &m1;
+static __fram mat_t *inter2 = &m2;
 static __fram uint scratch_bak[SCRATCH_SIZE];
 
+// Public tasks
+TASK(TASK_UID_BLAS_OFFSET, task_ds_zero);
+TASK(TASK_UID_BLAS_OFFSET + 1, task_ds_add);
+TASK(TASK_UID_BLAS_OFFSET + 2, task_ds_mul);
+TASK(TASK_UID_BLAS_OFFSET + 3, task_dm_add);
+TASK(TASK_UID_BLAS_OFFSET + 4, task_dm_mul);
+TASK(TASK_UID_BLAS_OFFSET + 5, task_dm_conv);
+TASK(TASK_UID_BLAS_OFFSET + 6, task_dm_conv_same);
+TASK(TASK_UID_BLAS_OFFSET + 7, task_sm_mul);
+TASK(TASK_UID_BLAS_OFFSET + 8, task_sm_conv);
+TASK(TASK_UID_BLAS_OFFSET + 9, task_sm_conv_same);
+
+// Private tasks
 void task_cleanup_blas();
-TASK(TASK_UID_BLAS_OFFSET + 8, task_cleanup_blas);
+TASK(TASK_UID_BLAS_OFFSET + 10, task_cleanup_blas);
 
 // Resets a task
 static __fram task_t *last_task;
 void task_cleanup_blas() {
-	// PRINTF("\r\n     Finishing BLAS");
+	PRINTF("\r\n     Finishing BLAS");
 	memset(last_task->info.scratch, 0, sizeof(unsigned int) * SCRATCH_SIZE);
 	transition_to(last_task->info.return_task);
-}
-
-// Initialize the blas library
-void task_init_blas() {
-	PRINTF("\r\n Initializing BLAS");
-	inter1 = &m1;
-	inter1->data = data1;
-	inter2 = &m2;
-	inter2->data = data2;
-	last_task = CUR_TASK;
-	TRANSITION_TO(task_cleanup_blas);
 }
 
 // Dense scalar addition
@@ -51,6 +51,25 @@ void task_ds_add() {
 	for(uint i = CUR_INFO.scratch[0]; i < rows; i = ++CUR_INFO.scratch[0]) {
 		for(uint j = CUR_INFO.scratch[1]; j < cols; j = ++CUR_INFO.scratch[1]) {
 			fixed w = F_ADD(MAT_GET(src, i, j), MAT_GET(filter, 0));
+			MAT_SET(dest, w, i, j);
+		}
+		CUR_INFO.scratch[1] = 0;
+	}
+	last_task = CUR_TASK;
+	POP_STACK(mat_stack, 3);
+	TRANSITION_TO(task_cleanup_blas);
+}
+
+// Dense scalar multiplication
+void task_ds_mul() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+	uint rows = MAT_GET_DIM(src, 0);
+	uint cols = MAT_GET_DIM(src, 1);
+	for(uint i = CUR_INFO.scratch[0]; i < rows; i = ++CUR_INFO.scratch[0]) {
+		for(uint j = CUR_INFO.scratch[1]; j < cols; j = ++CUR_INFO.scratch[1]) {
+			fixed w = F_MUL(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}
 		CUR_INFO.scratch[1] = 0;

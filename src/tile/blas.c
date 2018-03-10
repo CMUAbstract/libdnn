@@ -63,8 +63,8 @@ void task_ds_add() {
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 	uint rows = MAT_GET_DIM(src, 0);
 	uint cols = MAT_GET_DIM(src, 1);
-	uint tile_size_x = greatest_tile_size(cols, MAX_TILE_SIZE);
-	uint tile_size_y = greatest_tile_size(rows, MAX_TILE_SIZE);
+	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
+	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 	for(uint i = CUR_INFO.scratch[0]; i < CUR_INFO.scratch[0] + tile_size_y; i++) {
 		for(uint j = CUR_INFO.scratch[1]; j < CUR_INFO.scratch[1] + tile_size_x; j++) {
 			fixed w = F_ADD(MAT_GET(src, i, j), MAT_GET(filter, 0));
@@ -88,8 +88,8 @@ void task_ds_zero() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	uint rows = MAT_GET_DIM(src, 0);
 	uint cols = MAT_GET_DIM(src, 1);
-	uint tile_size_x = greatest_tile_size(cols, MAX_TILE_SIZE);
-	uint tile_size_y = greatest_tile_size(rows, MAX_TILE_SIZE);
+	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
+	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 	for(uint i = CUR_INFO.scratch[0]; i < CUR_INFO.scratch[0] + tile_size_y; i++) {
 		for(uint j = CUR_INFO.scratch[1]; j < CUR_INFO.scratch[1] + tile_size_x; j++) {
 			MAT_SET(dest, 0, i, j);
@@ -113,8 +113,8 @@ void task_dm_add() {
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 	uint rows = MAT_GET_DIM(src, 0);
 	uint cols = MAT_GET_DIM(src, 1);
-	uint tile_size_x = greatest_tile_size(cols, MAX_TILE_SIZE);
-	uint tile_size_y = greatest_tile_size(rows, MAX_TILE_SIZE);
+	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
+	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 	for(uint i = CUR_INFO.scratch[0]; i < CUR_INFO.scratch[0] + tile_size_y; i++) {
 		for(uint j = CUR_INFO.scratch[1]; j < CUR_INFO.scratch[1] + tile_size_x; j++) {
 			fixed w = F_ADD(MAT_GET(src, i, j), MAT_GET(filter, i, j));
@@ -140,8 +140,8 @@ void task_dm_mul() {
 	uint rows = MAT_GET_DIM(filter, 0);
 	uint cols = MAT_GET_DIM(filter, 1);
 	uint dcols = MAT_GET_DIM(dest, 1);
-	uint tile_size_x = greatest_tile_size(cols, MAX_TILE_SIZE);
-	uint tile_size_y = greatest_common_tile_size(rows, dcols, MAX_TILE_SIZE);
+	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
+	uint tile_size_y = greatest_common_tile_size(rows, dcols, CONFIG_TILE_SIZE);
 
 	MAT_RESHAPE(inter1, tile_size_y, tile_size_x);
 
@@ -211,9 +211,9 @@ void task_dm_conv() {
 	uint fcols = MAT_GET_DIM(filter, 2);
 	uint i = CUR_INFO.scratch[0];
 	uint j = CUR_INFO.scratch[1];
-	uint tile_size_z = greatest_tile_size(flayers, MAX_TILE_SIZE);
-	uint tile_size_y = greatest_tile_size(frows, MAX_TILE_SIZE);
-	uint tile_size_x = greatest_tile_size(fcols, MAX_TILE_SIZE);
+	uint tile_size_z = greatest_tile_size(flayers, CONFIG_TILE_SIZE);
+	uint tile_size_y = greatest_tile_size(frows, CONFIG_TILE_SIZE);
+	uint tile_size_x = greatest_tile_size(fcols, CONFIG_TILE_SIZE);
 
 	fixed w = 0;
 	for(uint k = 0; k < tile_size_z; k++) {
@@ -275,7 +275,7 @@ void task_sm_mul() {
 	uint cols = MAT_GET_DIM(src, 0); // m => k
 	uint dcols = MAT_GET_DIM(dest, 1); // p => j
 	uint total_elements = MAT_GET_DIM(filter, 0);
-	uint tile_size_x = greatest_tile_size(dcols, MAX_TILE_SIZE);
+	uint tile_size_x = greatest_tile_size(dcols, CONFIG_TILE_SIZE);
 	MAT_RESHAPE(inter1, rows, dcols);
 
 	uint pos = CUR_INFO.scratch[0];
@@ -343,8 +343,8 @@ void task_sm_conv() {
 
 	uint rows = MAT_GET_DIM(dest, 0);
 	uint cols = MAT_GET_DIM(dest, 1);
-	uint tile_size_x = greatest_tile_size(cols, MAX_TILE_SIZE);
-	uint tile_size_y = greatest_tile_size(rows, MAX_TILE_SIZE);
+	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
+	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 
 	uint frows = filter->sparse.dims[1];
 	uint fcols = filter->sparse.dims[2];

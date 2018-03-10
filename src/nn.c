@@ -8,31 +8,32 @@
 #include "mem.h"
 #include "types.h"
 #include "state.h"
+#include "buffer.h"
 #include "fixed.h"
 #include "mat.h"
 #include "misc.h"
 
-// BLAS Tasks
-TASK(TASK_UID_BLAS_OFFSET, task_init_blas);
-TASK(TASK_UID_BLAS_OFFSET + 1, task_ds_zero);
-TASK(TASK_UID_BLAS_OFFSET + 2, task_ds_add);
-TASK(TASK_UID_BLAS_OFFSET + 3, task_dm_add);
-TASK(TASK_UID_BLAS_OFFSET + 4, task_dm_mul);
-TASK(TASK_UID_BLAS_OFFSET + 5, task_dm_conv);
-TASK(TASK_UID_BLAS_OFFSET + 6, task_dm_conv_same);
-TASK(TASK_UID_BLAS_OFFSET + 7, task_sm_mul);
-TASK(TASK_UID_BLAS_OFFSET + 8, task_sm_conv);
-TASK(TASK_UID_BLAS_OFFSET + 9, task_sm_conv_same);
-
-static __hifram fixed data[MAX_LAYER_SIZE];
-static __fram mat_t m;
-static __fram mat_t *inter;
-static __fram mat_t c_filter, c_dest, c_inter, c_src;
-static __fram mat_t *c_filter_ptr, *c_dest_ptr, *c_inter_ptr, *c_src_ptr;
+static __fram mat_t m = {.data = layer_buffers[0]};
+static __fram mat_t *inter = &m;
+static __fram mat_t c_filter, c_dest, c_inter;
+static __fram mat_t *c_filter_ptr = &c_filter;
+static __fram mat_t *c_dest_ptr = &c_dest;
+static __fram mat_t *c_inter_ptr = &c_inter;
 static __fram uint scratch_bak[SCRATCH_SIZE];
 
+// Public tasks
+TASK(TASK_UID_NN_OFFSET + 0, task_d_conv);
+TASK(TASK_UID_NN_OFFSET + 1, task_d_conv1d);
+TASK(TASK_UID_NN_OFFSET + 2, task_s_conv);
+TASK(TASK_UID_NN_OFFSET + 3, task_d_fc);
+TASK(TASK_UID_NN_OFFSET + 4, task_s_fc);
+TASK(TASK_UID_NN_OFFSET + 5, task_pool);
+TASK(TASK_UID_NN_OFFSET + 6, task_relu);
+TASK(TASK_UID_NN_OFFSET + 7, task_filter);
+
+// Private task
 void task_cleanup_nn();
-TASK(TASK_UID_BLAS_OFFSET + 7, task_cleanup_nn);
+TASK(TASK_UID_BLAS_OFFSET + 9, task_cleanup_nn);
 
 // Resets a task
 static __fram task_t *last_task;
@@ -40,19 +41,6 @@ void task_cleanup_nn() {
 	PRINTF("\r\n Cleaning up NN");
 	memset(last_task->info.scratch, 0, sizeof(unsigned int) * SCRATCH_SIZE);
 	transition_to(last_task->info.return_task);
-}
-
-void task_init_nn() {
-	PRINTF("\r\n Initializing NN");
-	inter = &m;
-	inter->data = data;
-	c_filter_ptr = &c_filter;
-	c_dest_ptr = &c_dest;
-	c_inter_ptr = &c_inter;
-	c_src_ptr = &c_src;
-	last_task = CUR_TASK;
-	TASK_REF(task_init_blas)->info.return_task = TASK_REF(task_cleanup_nn);
-	TRANSITION_TO(task_init_blas);
 }
 
 void task_d_conv() {

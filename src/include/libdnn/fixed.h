@@ -25,6 +25,10 @@
 #define F_EQ(a, b) a == b
 #define F_NEQ(a, b) a != b
 
+#define F_PI F_LIT(3.1415926)
+#define F_TWO_PI F_LIT(6.2831853)
+#define F_HALF_PI F_LIT(1.5707963)
+
 // Comment out middle two lines for int arithmetic to work
 static inline fixed f_mul(fixed a, fixed b) {
     signed int tmp = a * b;
@@ -59,31 +63,28 @@ static inline fixed f_sqrt(fixed a) {
 	return tmp;
 }
 
-const fixed PI = F_LIT(3.1415926);
-const fixed TWO_PI = F_LIT(6.2831853);
-const fixed HALF_PI = F_LIT(1.5707963);
 static inline fixed f_cos(fixed a) {
 	fixed tmp = a;
 	// Scale
-	if(F_LT(TWO_PI, tmp)) {
-		fixed close = F_MUL(TWO_PI, -F_ROUND(F_DIV(tmp, TWO_PI)));
+	if(F_LT(F_TWO_PI, tmp)) {
+		fixed close = F_MUL(F_TWO_PI, -F_ROUND(F_DIV(tmp, F_TWO_PI)));
 		tmp = F_ADD(tmp, close);
-	} else if(F_LT(tmp, -TWO_PI)) {
-		fixed close = F_MUL(TWO_PI, F_ROUND(F_DIV(-tmp, TWO_PI)));
+	} else if(F_LT(tmp, -F_TWO_PI)) {
+		fixed close = F_MUL(F_TWO_PI, F_ROUND(F_DIV(-tmp, F_TWO_PI)));
 		tmp = F_ADD(tmp, close);
 	}
 
-	// Center around -PI and PI
-	if (F_LT(tmp, -PI)) {
-    	tmp = F_ADD(TWO_PI, tmp);
-	} else if (F_LT(PI, tmp)) {
-	    tmp = F_ADD(-TWO_PI, tmp);
+	// Center around -F_PI and F_PI
+	if (F_LT(tmp, -F_PI)) {
+    	tmp = F_ADD(F_TWO_PI, tmp);
+	} else if (F_LT(F_PI, tmp)) {
+	    tmp = F_ADD(-F_TWO_PI, tmp);
 	}
 
 	// Shift
-	tmp = F_ADD(tmp, HALF_PI);
-	if (F_LT(PI, tmp)) {
-		tmp = F_ADD(-TWO_PI, tmp);
+	tmp = F_ADD(tmp, F_HALF_PI);
+	if (F_LT(F_PI, tmp)) {
+		tmp = F_ADD(-F_TWO_PI, tmp);
 	}
 
 	// Apply cos/sin
@@ -114,19 +115,19 @@ static inline fixed f_cos(fixed a) {
 static inline fixed f_sin(fixed a) {
 	fixed tmp = a;
 	// Scale
-	if(F_LT(TWO_PI, tmp)) {
-		fixed close = F_MUL(TWO_PI, -F_ROUND(F_DIV(tmp, TWO_PI)));
+	if(F_LT(F_TWO_PI, tmp)) {
+		fixed close = F_MUL(F_TWO_PI, -F_ROUND(F_DIV(tmp, F_TWO_PI)));
 		tmp = F_ADD(tmp, close);
-	} else if(F_LT(tmp, -TWO_PI)) {
-		fixed close = F_MUL(TWO_PI, F_ROUND(F_DIV(-tmp, TWO_PI)));
+	} else if(F_LT(tmp, -F_TWO_PI)) {
+		fixed close = F_MUL(F_TWO_PI, F_ROUND(F_DIV(-tmp, F_TWO_PI)));
 		tmp = F_ADD(tmp, close);
 	}
 
-	// Center around -PI and PI
-	if (F_LT(tmp, -PI)) {
-    	tmp = F_ADD(TWO_PI, tmp);
-	} else if (F_LT(PI, tmp)) {
-	    tmp = F_ADD(-TWO_PI, tmp);
+	// Center around -F_PI and F_PI
+	if (F_LT(tmp, -F_PI)) {
+    	tmp = F_ADD(F_TWO_PI, tmp);
+	} else if (F_LT(F_PI, tmp)) {
+	    tmp = F_ADD(-F_TWO_PI, tmp);
 	}
 
 	// Apply cos/sin
