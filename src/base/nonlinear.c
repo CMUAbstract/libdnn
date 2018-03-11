@@ -16,15 +16,16 @@
 TASK(TASK_UID_NONLINEAR_OFFSET + 1, task_pool);
 TASK(TASK_UID_NONLINEAR_OFFSET + 2, task_relu);
 TASK(TASK_UID_NONLINEAR_OFFSET + 3, task_filter);
+TASK(TASK_UID_NONLINEAR_OFFSET + 4, task_transpose);
 
 // Private tasks
 void task_cleanup_nonlinear();
-TASK(TASK_UID_NONLINEAR_OFFSET + 4, task_cleanup_nonlinear);
+TASK(TASK_UID_NONLINEAR_OFFSET + 5, task_cleanup_nonlinear);
 
 // Resets a task
 static __fram task_t *last_task;
 void task_cleanup_nonlinear() {
-	PRINTF("\r\n Cleaning up NN");
+	PRINTF("\r\n Cleaning up Nonlinear");
 	memset(last_task->info.scratch, 0, sizeof(unsigned int) * SCRATCH_SIZE);
 	transition_to(last_task->info.return_task);
 }

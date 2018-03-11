@@ -27,7 +27,7 @@ TASK(TASK_UID_NONLINEAR_OFFSET + 5, task_cleanup_nonlinear);
 // Resets a task
 static __fram task_t *last_task;
 void task_cleanup_nonlinear() {
-	PRINTF("\r\n Cleaning up NN");
+	PRINTF("\r\n Cleaning up Nonlinear");
 	memset(last_task->info.scratch, 0, sizeof(unsigned int) * SCRATCH_SIZE);
 	transition_to(last_task->info.return_task);
 }
