@@ -26,13 +26,10 @@ TASK(TASK_UID_NN_OFFSET + 0, task_d_conv);
 TASK(TASK_UID_NN_OFFSET + 1, task_s_conv);
 TASK(TASK_UID_NN_OFFSET + 2, task_d_fc);
 TASK(TASK_UID_NN_OFFSET + 3, task_s_fc);
-TASK(TASK_UID_NN_OFFSET + 4, task_pool);
-TASK(TASK_UID_NN_OFFSET + 5, task_relu);
-TASK(TASK_UID_NN_OFFSET + 6, task_filter);
 
 // Private task
 void task_cleanup_nn();
-TASK(TASK_UID_BLAS_OFFSET + 9, task_cleanup_nn);
+TASK(TASK_UID_BLAS_OFFSET + 4, task_cleanup_nn);
 
 // Resets a task
 static __fram task_t *last_task;

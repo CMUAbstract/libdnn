@@ -4,6 +4,8 @@
 #include <libalpaca/alpaca.h>
 
 #include "linalg.h"
+#include "nonlinear.h"
+#include "buffer.h"
 #include "blas.h"
 #include "mem.h"
 #include "types.h"
@@ -12,6 +14,8 @@
 #include "mat.h"
 #include "misc.h"
 
+static __fram mat_t m = {.data = LAYER_BUFFER(0)};
+static __fram mat_t *inter = &m;
 static __fram uint scratch_bak[SCRATCH_SIZE];
 
 // Public tasks
@@ -30,5 +34,44 @@ void task_cleanup_linalg() {
 }
 
 void task_norm() {
-	#pragma GCC warning "norm not yet implemented"
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	MAT_RESHAPE(inter, 1, 1);
+	if(CUR_INFO.scratch[0] == 0) {
+		PRINTF("\r\n    Taking transpose");
+		// Assumes filter, dest, src in that order
+		MAT_RESHAPE(dest, dest->dims[1], dest->dims[0]);
+		PUSH_STACK(mat_stack, dest, src);
+		scratch_bak[0] = 1;	
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		TASK_REF(task_transpose)->info.return_task = CUR_TASK;
+		TRANSITION_TO(task_transpose);
+	} else if(CUR_INFO.scratch[0] == 1) {
+		PRINTF("\r\n    Finding norm");
+		// Assumes filter, dest, src in that order
+		PUSH_STACK(mat_stack, dest, inter, src);
+		scratch_bak[0] = 2;
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		TASK_REF(task_ds_div)->info.return_task = CUR_TASK;
+		TRANSITION_TO(task_ds_div);
+	} else if(CUR_INFO.scratch[0] == 2) {
+		PRINTF("\r\n    Taking sqrt");
+		scratch_bak[0] = 3;
+		scratch_bak[1] = F_SQRT(MAT_GET(inter, 0, 0)); 
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(inter->data), sizeof(fixed));
+		transition_to(CUR_TASK);
+	} else if(CUR_INFO.scratch[0] == 3) {
+		PRINTF("\r\n    Applying norm");
+		// Assumes filter, dest, src in that order
+		MAT_RESHAPE(dest, dest->dims[1], dest->dims[0]);
+		PUSH_STACK(mat_stack, inter, dest, src);
+		scratch_bak[0] = 4;
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		TASK_REF(task_ds_div)->info.return_task = CUR_TASK;
+		TRANSITION_TO(task_ds_div);
+	}
+	last_task = CUR_TASK;
+	POP_STACK(mat_stack, 2);
+	TRANSITION_TO(task_cleanup_linalg);
 }

@@ -2,7 +2,7 @@
 #define LINALG_H
 #include <libalpaca/alpaca.h>
 
-#define TASK_UID_LINALG_OFFSET 30
+#define TASK_UID_LINALG_OFFSET 50
 
 void task_norm();
 

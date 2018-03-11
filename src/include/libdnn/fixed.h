@@ -51,4 +51,8 @@ static inline fixed f_round(fixed a) {
 	return a & (F_MASK);
 }
 
+fixed f_sqrt(fixed a);
+fixed f_sin(fixed a);
+fixed f_cos(fixed a);
+
 #endif

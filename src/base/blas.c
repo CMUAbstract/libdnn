@@ -15,17 +15,18 @@
 TASK(TASK_UID_BLAS_OFFSET, task_ds_zero);
 TASK(TASK_UID_BLAS_OFFSET + 1, task_ds_add);
 TASK(TASK_UID_BLAS_OFFSET + 2, task_ds_mul);
-TASK(TASK_UID_BLAS_OFFSET + 3, task_dm_add);
-TASK(TASK_UID_BLAS_OFFSET + 4, task_dm_mul);
-TASK(TASK_UID_BLAS_OFFSET + 5, task_dm_conv);
-TASK(TASK_UID_BLAS_OFFSET + 6, task_dm_conv_same);
-TASK(TASK_UID_BLAS_OFFSET + 7, task_sm_mul);
-TASK(TASK_UID_BLAS_OFFSET + 8, task_sm_conv);
-TASK(TASK_UID_BLAS_OFFSET + 9, task_sm_conv_same);
+TASK(TASK_UID_BLAS_OFFSET + 3, task_ds_div);
+TASK(TASK_UID_BLAS_OFFSET + 4, task_dm_add);
+TASK(TASK_UID_BLAS_OFFSET + 5, task_dm_mul);
+TASK(TASK_UID_BLAS_OFFSET + 6, task_dm_conv);
+TASK(TASK_UID_BLAS_OFFSET + 7, task_dm_conv_same);
+TASK(TASK_UID_BLAS_OFFSET + 8, task_sm_mul);
+TASK(TASK_UID_BLAS_OFFSET + 9, task_sm_conv);
+TASK(TASK_UID_BLAS_OFFSET + 10, task_sm_conv_same);
 
 // Private tasks
 void task_cleanup_blas();
-TASK(TASK_UID_BLAS_OFFSET + 10, task_cleanup_blas);
+TASK(TASK_UID_BLAS_OFFSET + 11, task_cleanup_blas);
 
 // Resets a task
 static __fram task_t *last_task;
@@ -63,6 +64,24 @@ void task_ds_mul() {
 	for(uint i = 0; i < rows; i++) {
 		for(uint j = 0; j < cols; j++) {
 			fixed w = F_MUL(MAT_GET(src, i, j), MAT_GET(filter, 0));
+			MAT_SET(dest, w, i, j);
+		}
+	}
+	last_task = CUR_TASK;
+	POP_STACK(mat_stack, 3);
+	TRANSITION_TO(task_cleanup_blas);
+}
+
+// Dense scalar division
+void task_ds_div() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+	uint rows = MAT_GET_DIM(src, 0);
+	uint cols = MAT_GET_DIM(src, 1);
+	for(uint i = 0; i < rows; i++) {
+		for(uint j = 0; j < cols; j++) {
+			fixed w = F_DIV(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}
 	}

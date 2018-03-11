@@ -3,7 +3,7 @@
 #include <libio/console.h>
 #include <libalpaca/alpaca.h>
 
-#include "nn.h"
+#include "nonlinear.h"
 #include "blas.h"
 #include "mem.h"
 #include "types.h"
@@ -12,8 +12,14 @@
 #include "mat.h"
 #include "misc.h"
 
+// Public tasks
+TASK(TASK_UID_NONLINEAR_OFFSET + 1, task_pool);
+TASK(TASK_UID_NONLINEAR_OFFSET + 2, task_relu);
+TASK(TASK_UID_NONLINEAR_OFFSET + 3, task_filter);
+
+// Private tasks
 void task_cleanup_nonlinear();
-TASK(TASK_UID_BLAS_OFFSET + 8, task_cleanup_nonlinear);
+TASK(TASK_UID_NONLINEAR_OFFSET + 4, task_cleanup_nonlinear);
 
 // Resets a task
 static __fram task_t *last_task;
@@ -81,6 +87,21 @@ void task_relu() {
 			MAT_SET(dest, max, i, j);
 			if(F_LT(max, F_LIT(0.0)))
 				MAT_SET(dest, F_LIT(0.0), i, j);
+		}
+	}
+	POP_STACK(mat_stack, 2);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_nonlinear);
+}
+
+void task_transpose() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	uint rows = MAT_GET_DIM(src, 0);
+	uint cols = MAT_GET_DIM(src, 1);
+	for(uint i = 0; i < rows; i++) {
+		for(uint j = 0; j < cols; j++) {
+			MAT_SET(dest, MAT_GET(src, i, j), j, i);	
 		}
 	}
 	POP_STACK(mat_stack, 2);
