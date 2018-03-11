@@ -1,5 +1,6 @@
 #ifndef LINALG_H
 #define LINALG_H
+#include <libalpaca/alpaca.h>
 
 #define TASK_UID_LINALG_OFFSET 30
 

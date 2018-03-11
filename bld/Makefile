@@ -1,6 +1,6 @@
 LIB = libdnn
 
-OBJECTS = mat.o nn.o state.o linalg.o buffer.o \
+OBJECTS = mat.o nn.o state.o linalg.o buffer.o fixed.o \
 			$(LIBDNN_BACKEND)/nonlinear.o \
 			$(LIBDNN_BACKEND)/blas.o 
 

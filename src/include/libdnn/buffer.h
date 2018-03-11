@@ -14,7 +14,6 @@
 extern fixed mat_buffers[MAT_BUFFER_NUMBER][MAT_BUFFER_SIZE];
 extern fixed layer_buffers[LAYER_BUFFER_NUMBER][LAYER_BUFFER_SIZE];
 
-void task_init();
-
-extern TASK_DEC(task_init);
+#define MAT_BUFFER(idx) (mat_buffers[idx])
+#define LAYER_BUFFER(idx) (layer_buffers[idx])
 #endif

@@ -11,8 +11,8 @@
 #include "mat.h"
 #include "misc.h"
 
-static __fram mat_t m1 = {.data = mat_buffers[0]};
-static __fram mat_t m2 = {.data = mat_buffers[1]};
+static __fram mat_t m1 = {.data = MAT_BUFFER(0)};
+static __fram mat_t m2 = {.data = MAT_BUFFER(1)};
 static __fram mat_t *inter1 = &m1;
 static __fram mat_t *inter2 = &m2;
 static __fram uint scratch_bak[SCRATCH_SIZE];
@@ -36,7 +36,7 @@ TASK(TASK_UID_BLAS_OFFSET + 10, task_cleanup_blas);
 // Resets a task
 static __fram task_t *last_task;
 void task_cleanup_blas() {
-	PRINTF("\r\n     Finishing BLAS");
+	// PRINTF("\r\n     Finishing BLAS");
 	memset(last_task->info.scratch, 0, sizeof(unsigned int) * SCRATCH_SIZE);
 	transition_to(last_task->info.return_task);
 }
