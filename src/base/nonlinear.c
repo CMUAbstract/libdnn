@@ -102,7 +102,7 @@ void task_transpose() {
 	uint cols = MAT_GET_DIM(src, 1);
 	for(uint i = 0; i < rows; i++) {
 		for(uint j = 0; j < cols; j++) {
-			MAT_SET(dest, MAT_GET(src, i, j), j, i);	
+			MAT_SET(dest, MAT_GET(src, i, j), j, i);
 		}
 	}
 	POP_STACK(mat_stack, 2);
