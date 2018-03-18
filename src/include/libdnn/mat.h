@@ -37,6 +37,19 @@
 			((uint[]){__VA_ARGS__})[2]) = val :								\
 	mat_set(m, val, MAT_NUMARGS(__VA_ARGS__), (uint[]){__VA_ARGS__}))
 
+#define MAT_PTR(m, ...) (													\
+	(MAT_NUMARGS(__VA_ARGS__) == 1) ? 											\
+		(m->data + ((uint[]){__VA_ARGS__})[0]) :							\
+	(MAT_NUMARGS(__VA_ARGS__) == 2) ? 											\
+		(m->data + ((uint[]){__VA_ARGS__})[0] * 							\
+			m->dims[m->len_dims - 1] + ((uint[]){__VA_ARGS__})[1]):			\
+	(MAT_NUMARGS(__VA_ARGS__) == 3) ? 											\
+		(m->data + ((uint[]){__VA_ARGS__})[0] *								\
+			m->dims[m->len_dims - 1] * m->dims[m->len_dims - 2] +			\
+			m->dims[m->len_dims - 1] * ((uint[]){__VA_ARGS__})[1] + 		\
+			((uint[]){__VA_ARGS__})[2]):									\
+	mat_ptr(m, MAT_NUMARGS(__VA_ARGS__), (uint[]){__VA_ARGS__}))
+
 #define MAT_GET_DIM(m, axis) (mat_get_dim(m, axis))
 
 #ifdef CONFIG_CONSOLE
@@ -54,6 +67,8 @@ void mat_reshape(mat_t *, uint, uint[]);
 mat_t mat_constrain(mat_t *, uint, uint[]);
 
 fixed mat_get(mat_t *, uint, uint[]);
+
+fixed *mat_ptr(mat_t *, uint, uint[]);
 
 void mat_set(mat_t *, fixed, uint, uint[]);
 

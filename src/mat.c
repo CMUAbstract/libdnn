@@ -59,6 +59,10 @@ fixed mat_get(mat_t *m, uint len, uint idxs[]) {
 	return *(m->data + _offset_calc(m, len, idxs));
 }
 
+fixed *mat_ptr(mat_t *m, uint len, uint idxs[]) {
+	return (m->data + _offset_calc(m, len, idxs));
+}
+
 void mat_set(mat_t *m, fixed val, uint len, uint idxs[]) {
 	*(m->data + _offset_calc(m, len, idxs)) = val;
 }

@@ -12,8 +12,6 @@
 #include "mat.h"
 #include "misc.h"
 
-static __fram uint scratch_bak[SCRATCH_SIZE];
-
 // Public tasks
 TASK(TASK_UID_NONLINEAR_OFFSET + 1, task_pool);
 TASK(TASK_UID_NONLINEAR_OFFSET + 2, task_relu);

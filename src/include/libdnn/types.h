@@ -1,5 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
+#include <stdbool.h>
 
 typedef unsigned int uint;
 
@@ -23,10 +24,5 @@ typedef struct {
 		uint *sizes;
 	} sparse;
 } mat_t;
-
-typedef enum {
-	false,
-	true,
-} bool;
 
 #endif

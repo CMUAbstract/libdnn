@@ -2,7 +2,7 @@
 #include <libio/console.h>
 #include <libalpaca/alpaca.h>
 
-#include "nn.h"
+#include "nonlinear.h"
 #include "blas.h"
 #include "mem.h"
 #include "types.h"
@@ -11,10 +11,17 @@
 #include "mat.h"
 #include "misc.h"
 
-static __fram uint scratch_bak[SCRATCH_SIZE];
+// Public tasks
+TASK(TASK_UID_NONLINEAR_OFFSET + 1, task_pool);
+TASK(TASK_UID_NONLINEAR_OFFSET + 2, task_relu);
+TASK(TASK_UID_NONLINEAR_OFFSET + 3, task_filter);
+TASK(TASK_UID_NONLINEAR_OFFSET + 4, task_transpose);
 
+// Private tasks
 void task_cleanup_nonlinear();
-TASK(TASK_UID_BLAS_OFFSET + 8, task_cleanup_nonlinear);
+TASK(TASK_UID_NONLINEAR_OFFSET + 5, task_cleanup_nonlinear);
+
+static __fram uint scratch_bak[SCRATCH_SIZE];
 
 // Resets a task
 static __fram task_t *last_task;
@@ -49,10 +56,10 @@ void task_pool() {
 	if(j + stride[1] == rows && k + stride[2] == cols) {
 		scratch_bak[0] = CUR_INFO.scratch[0] + 1;
 		scratch_bak[1] = 0;
-	} else if(k + stride[1] == cols) {
+	} else if(k + stride[2] == cols) {
 		scratch_bak[1] = CUR_INFO.scratch[1] + stride[1];
 	}
-	scratch_bak[2] = (k + stride[1] == cols) ? 0 : CUR_INFO.scratch[2] + stride[2];
+	scratch_bak[2] = (k + stride[2] == cols) ? 0 : CUR_INFO.scratch[2] + stride[2];
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
 	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
@@ -107,8 +114,8 @@ void task_relu() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	uint rows = MAT_GET_DIM(src, 0);
 	uint cols = MAT_GET_DIM(src, 1);
-	uint tile_size_x = greatest_tile_size(cols, MAX_TILE_SIZE);
-	uint tile_size_y = greatest_tile_size(rows, MAX_TILE_SIZE);
+	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
+	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 	fixed max = F_LIT(0.0);
 	for(uint i = 0; i < tile_size_y; i++) {
 		uint idx_i = CUR_INFO.scratch[0] + i;
@@ -118,6 +125,34 @@ void task_relu() {
 			MAT_SET(dest, max, idx_i, idx_j);
 			if(F_LT(max, F_LIT(0.0)))
 				MAT_SET(dest, F_LIT(0.0), idx_i, idx_j);
+		}
+	}
+	scratch_bak[0] = (CUR_INFO.scratch[1] + tile_size_x == cols) ? CUR_INFO.scratch[0] + tile_size_y : 0;
+	scratch_bak[1] = (CUR_INFO.scratch[1] + tile_size_x == cols) ? 0 : CUR_INFO.scratch[1] + tile_size_x;
+	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
+	if(!(CUR_INFO.scratch[0] + tile_size_y == rows &&
+		 CUR_INFO.scratch[1] + tile_size_x == cols)) {
+		transition_to(CUR_TASK);
+	}
+	POP_STACK(mat_stack, 2);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_nonlinear);
+}
+
+void task_transpose() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	uint rows = MAT_GET_DIM(src, 0);
+	uint cols = MAT_GET_DIM(src, 1);
+	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
+	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
+	for(uint i = 0; i < tile_size_y; i++) {
+		uint idx_i = CUR_INFO.scratch[0] + i;
+		for(uint j = 0; j < tile_size_x; j++) {
+			uint idx_j = CUR_INFO.scratch[1] + j;
+			fixed val = MAT_GET(src, idx_i, idx_j);
+			MAT_SET(dest, val, idx_j, idx_i);
 		}
 	}
 	scratch_bak[0] = (CUR_INFO.scratch[1] + tile_size_x == cols) ? CUR_INFO.scratch[0] + tile_size_y : 0;
