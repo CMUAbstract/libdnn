@@ -70,7 +70,7 @@ uint greatest_tile_size(uint dim, uint max) {
 
 	uint i = 2;
 	uint max_divisor = i;
-	while(i < max && i <= dim) {
+	while(i <= max && i <= dim) {
         if(dim % i == 0) max_divisor = i;
     	i += 2;
     }
@@ -450,47 +450,47 @@ void task_sm_conv() {
 	for(uint i = 0; i < common_tile_size + 1; i++) {
 		PRINTF("%i ", tsrc1[i]);
 	}
+	uint load_size = (common_tile_size > common_tile_size_cols) ? common_tile_size : common_tile_size_cols;
 	msp_status status;
 	for(uint i = CUR_INFO.scratch[2]; i < rows; i = ++CUR_INFO.scratch[2]) {
-		uint dma_j = 0;
+		uint dma_j = CUR_INFO.scratch[3] + n;
 		uint dma_offset = 0;
 		uint dma_pos = 0;
 		for(uint j = CUR_INFO.scratch[3]; j < cols; j = ++CUR_INFO.scratch[3]) {
-			if(j + n >= dma_j) {
-			    DMA_setTransferSize(dmaConfig[1].channelSelect, common_tile_size_cols);
+			if(j + n + common_tile_size >= dma_j) {
+			    DMA_setTransferSize(dmaConfig[1].channelSelect, load_size);
 			    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
-								(uint32_t) MAT_PTR(src, k, i + l, j + n),
+								(uint32_t) MAT_PTR(src, k, i + l, dma_j),
 	                      		DMA_DIRECTION_INCREMENT);
 			    DMA_setDstAddress(dmaConfig[1].channelSelect,
 			                    (uint32_t) (tsrc2 + dma_offset),
 			                    DMA_DIRECTION_INCREMENT);
 				DMA_enableTransfers(dmaConfig[1].channelSelect);
 
-			    DMA_setTransferSize(dmaConfig[2].channelSelect, common_tile_size_cols);
+			    DMA_setTransferSize(dmaConfig[2].channelSelect, load_size);
 			    DMA_setSrcAddress(dmaConfig[2].channelSelect, 
-								(uint32_t) MAT_PTR(src, k, i + l, j + n + 1),
+								(uint32_t) MAT_PTR(src, k, i + l, dma_j),
 	                      		DMA_DIRECTION_INCREMENT);
 			    DMA_setDstAddress(dmaConfig[2].channelSelect,
-			                    (uint32_t) (tsrc3 + dma_offset),
+			                    (uint32_t) (tsrc3 + dma_offset + 1),
 			                    DMA_DIRECTION_INCREMENT);
 				DMA_enableTransfers(dmaConfig[2].channelSelect);
 
 				DMA_startSleepTransfer(dmaConfig[1].channelSelect);
 			    DMA_startSleepTransfer(dmaConfig[2].channelSelect);
-			    dma_offset += common_tile_size_cols;
-			    dma_j = j + n + common_tile_size_cols;
+			    dma_offset += load_size;
+			    dma_j += load_size;
 			}
 
 		    fixed w = 0;
 		    if(zero == 2) w = MAT_GET(inter, i, j);
 		    while((LEACNF1 & LEABUSY) || msp_lea_locked) __no_operation(); // Spin waiting for LEA
 		    if(j % 2) {
-		    	status = msp_mac_q15(&params, tsrc1, tsrc3 + dma_pos, tdest);
+		    	status = msp_mac_q15(&params, tsrc1, tsrc3 + dma_pos + 2, tdest);
 	    		dma_pos += 2;
 		    } else {
 				status = msp_mac_q15(&params, tsrc1, tsrc2 + dma_pos, tdest);
 			}
-			// PRINTF("\r\n %i %u status: %u ", *tdest, dma_pos, status);
 			fixed rounded = ((*tdest >> 1) + F_K) >> F_N;
     		w = F_ADD(w, rounded);
     		MAT_SET(dest, w, i, j);
