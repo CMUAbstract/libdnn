@@ -21,6 +21,7 @@ static DSPLIB_DATA(tsrc3, 2) fixed tsrc3[MAT_BUFFER_SIZE];
 static DSPLIB_DATA(tdest, 2) fixed tdest[CONFIG_TILE_SIZE];
 
 static __fram DMA_initParam dmaConfig[3];
+static uint DMA_initialized = 0;
 
 static __fram uint scratch_bak[SCRATCH_SIZE];
 static __fram uint tile_size;
@@ -78,9 +79,41 @@ uint greatest_tile_size(uint dim, uint max) {
 }
 
 void check_calibrate(){
+	if(!DMA_initialized) {
+		PRINTF("\r\n Initializing DMA");
+		DMA_disableTransferDuringReadModifyWrite();
+		for(uint i = 0; i < 3; i++) {
+			dmaConfig[i].channelSelect = i << 4;
+			dmaConfig[i].transferModeSelect = DMA_TRANSFER_BLOCK;
+			dmaConfig[i].transferUnitSelect = DMA_SIZE_SRCWORD_DSTWORD;
+			DMA_init(&dmaConfig[i]);
+			DMA_enableInterrupt(dmaConfig[i].channelSelect);
+		}
+		DMA_initialized = 1;
+	}
 	if(tile_size != 0) return;
 	TASK_REF(task_calibrate)->info.return_task = CUR_TASK;
 	TRANSITION_TO(task_calibrate);
+}
+
+void task_debug2();
+void pulse(uint pin) {
+	P6DIR = 0x03;
+	P6OUT = pin;
+	__delay_cycles(0x100);
+	P6OUT = 0x00;
+}
+
+__known fixed debug_area2[10] = {0xadde};
+TASK(50, task_debug2);
+void task_debug2() {
+	P1OUT = 0x00;
+#ifdef CONFIG_INTERMITTENT
+	while(1){}
+#else
+	PRINTF("\r\n debugging...");
+	exit(0);
+#endif
 }
 
 void task_calibrate() {
@@ -107,14 +140,7 @@ void task_calibrate() {
 		status = msp_mac_q15(&params, tsrc1, tsrc2, tdest);
 		PRINTF("\r\n Done init: status: %u tile_size %u", status, CUR_INFO.scratch[1]);
 		msp_checkStatus(status);
-		DMA_disableTransferDuringReadModifyWrite();
-		for(uint i = 0; i < 3; i++) {
-			dmaConfig[i].channelSelect = i << 4;
-			dmaConfig[i].transferModeSelect = DMA_TRANSFER_BLOCK;
-			dmaConfig[i].transferUnitSelect = DMA_SIZE_SRCWORD_DSTWORD;
-			DMA_init(&dmaConfig[i]);
-			DMA_enableInterrupt(dmaConfig[i].channelSelect);
-		}
+		debug_area2[2] = 0x01;
 		write_to_gbuf((uint8_t *)(CUR_INFO.scratch + 1), (uint8_t *)(&tile_size), sizeof(uint));
 		transition_to(CUR_TASK);
 	} else if(CUR_INFO.scratch[0] == 2 && tile_size == 0) {
@@ -124,6 +150,7 @@ void task_calibrate() {
 		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 		transition_to(CUR_TASK);	
 	}
+	debug_area2[2] = 0x02;
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_blas);
 }
@@ -232,6 +259,9 @@ void task_dm_mul() {
 	uint cols = MAT_GET_DIM(filter, 1);
 	uint dcols = MAT_GET_DIM(dest, 1);
 	uint common_tile_size = greatest_tile_size(cols, tile_size);
+	if(common_tile_size & 0x01) {
+		common_tile_size -= 1;
+	}
 
 	uint zero = CUR_INFO.scratch[0];
 	if(zero == 0) {
@@ -254,7 +284,7 @@ void task_dm_mul() {
 		inter = tmp;
 	}
 
-	msp_mac_q15_params params = {.length = common_tile_size + common_tile_size % 2};
+	msp_mac_q15_params params = {.length = common_tile_size};
 	uint j = CUR_INFO.scratch[2];
 	PRINTF("\r\n j: %u tile_size: %u swapped: %u", j, common_tile_size, CUR_INFO.scratch[1]);
 	for(uint i = CUR_INFO.scratch[3]; i < rows; i = ++CUR_INFO.scratch[3]) {
@@ -429,7 +459,7 @@ void task_sm_conv() {
 		inter = tmp;
 	}
 
-	DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+	DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size + common_tile_size % 2);
     DMA_setSrcAddress(dmaConfig[0].channelSelect,
                       (uint32_t) (coalesced_filter),
                       DMA_DIRECTION_INCREMENT);
@@ -446,17 +476,17 @@ void task_sm_conv() {
     uint k = aligned_idx / (fcols * frows); // Layers
 	uint l = (aligned_idx % (fcols * frows)) / fcols; // Rows
 	uint n = aligned_idx % fcols; // Cols
-	PRINTF("\r\nFilter: ");
-	for(uint i = 0; i < common_tile_size + 1; i++) {
-		PRINTF("%i ", tsrc1[i]);
-	}
+	// PRINTF("\r\nFilter: ");
+	// for(uint i = 0; i < common_tile_size + 1; i++) {
+		// PRINTF("%i ", tsrc1[i]);
+	// }
 	uint load_size = (common_tile_size > common_tile_size_cols) ? common_tile_size : common_tile_size_cols;
-	msp_status status;
 	for(uint i = CUR_INFO.scratch[2]; i < rows; i = ++CUR_INFO.scratch[2]) {
 		uint dma_j = CUR_INFO.scratch[3] + n;
 		uint dma_offset = 0;
 		uint dma_pos = 0;
 		for(uint j = CUR_INFO.scratch[3]; j < cols; j = ++CUR_INFO.scratch[3]) {
+		    pulse(0x02);
 			if(j + n + common_tile_size >= dma_j) {
 			    DMA_setTransferSize(dmaConfig[1].channelSelect, load_size);
 			    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
@@ -481,19 +511,21 @@ void task_sm_conv() {
 			    dma_offset += load_size;
 			    dma_j += load_size;
 			}
-
 		    fixed w = 0;
 		    if(zero == 2) w = MAT_GET(inter, i, j);
-		    while((LEACNF1 & LEABUSY) || msp_lea_locked) __no_operation(); // Spin waiting for LEA
-		    if(j % 2) {
-		    	status = msp_mac_q15(&params, tsrc1, tsrc3 + dma_pos + 2, tdest);
+		    if(j & 0x1) {
+			    while((LEACNF1 & LEABUSY) || msp_lea_locked) __no_operation(); // Spin waiting for LEA
+		    	msp_mac_q15(&params, tsrc1, tsrc3 + dma_pos + 2, tdest);
 	    		dma_pos += 2;
 		    } else {
-				status = msp_mac_q15(&params, tsrc1, tsrc2 + dma_pos, tdest);
+			    while((LEACNF1 & LEABUSY) || msp_lea_locked) __no_operation(); // Spin waiting for LEA
+				msp_mac_q15(&params, tsrc1, tsrc2 + dma_pos, tdest);
 			}
+			debug_area2[i * 24 + j] = *tdest;
 			fixed rounded = ((*tdest >> 1) + F_K) >> F_N;
     		w = F_ADD(w, rounded);
     		MAT_SET(dest, w, i, j);
+		    pulse(0x02);
 		}
 		CUR_INFO.scratch[3] = 0;
 	}
@@ -531,6 +563,7 @@ void task_sm_conv() {
 			CUR_INFO.scratch[7] = 0;
 		}
 	}
+	pulse(0x01);
 	POP_STACK(mat_stack, 3);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_blas);

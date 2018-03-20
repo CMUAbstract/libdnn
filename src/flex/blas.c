@@ -1,4 +1,5 @@
 #include <string.h>
+#include <msp430.h>
 #include <libio/console.h>
 #include <libalpaca/alpaca.h>
 
@@ -33,6 +34,13 @@ TASK(TASK_UID_BLAS_OFFSET + 10, task_sm_conv_same);
 // Private tasks
 void task_cleanup_blas();
 TASK(TASK_UID_BLAS_OFFSET + 11, task_cleanup_blas);
+
+void pulse(uint pin) {
+	P6DIR = 0x03;
+	P6OUT = pin;
+	__delay_cycles(0x100);
+	P6OUT = 0x00;
+}
 
 // Resets a task
 static __fram task_t *last_task;
@@ -421,11 +429,13 @@ void task_sm_conv() {
 	uint n = idx % fcols; // Cols
 	for(uint i = CUR_INFO.scratch[2]; i < rows; i = ++CUR_INFO.scratch[2]) {
 		for(uint j = CUR_INFO.scratch[3]; j < cols; j = ++CUR_INFO.scratch[3]) {
+			pulse(0x02);
 			fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
 			if(zero == 2) {
 				w = F_ADD(w, MAT_GET(inter, i, j));
 			}
 			MAT_SET(dest, w, i, j);
+			pulse(0x02);
 		}
 		CUR_INFO.scratch[3] = 0;
 	}
@@ -438,6 +448,7 @@ void task_sm_conv() {
 	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
 	write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
 	if(pos < total_elements - 1) transition_to(CUR_TASK);
+	pulse(0x01);
 	POP_STACK(mat_stack, 3);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_blas);
