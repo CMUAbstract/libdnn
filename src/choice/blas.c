@@ -90,16 +90,12 @@ void check_calibrate(task_t *flex, task_t *lea) {
 	task_t *target = CUR_TASK;
 	if(flex != NULL && lea != NULL) {
 		mat_t *src = PEEK_STACK(mat_stack, 0);
-		mat_t *filter = PEEK_STACK(mat_stack, 2);
 		uint src_dma = MAT_GET_DIM(src, 1);
-		uint filter_dma = 0;
-		if(filter->len_dims == 3) {
-			filter_dma = MAT_GET_DIM(filter, 2);
-		} else {
-			filter_dma = MAT_GET_DIM(filter, 1);
+		if(src->len_dims == 2) {
+			src_dma = MAT_GET_DIM(src, 0);
 		}
 		target = flex;
-		if(src_dma >= 100 && filter_dma >= 10 && tile_size >= 10) {
+		if(src_dma >= 100 && tile_size >= 10) {
 			PRINTF("\r\n Choosing LEA");
 			target = lea;
 		}
@@ -704,9 +700,11 @@ void task_sm_conv_lea() {
 		}
 		coalesced_filter[common_tile_size] = 0;
 		scratch_bak[4] = 1;
+		scratch_bak[5] = 1;
 		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
 		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 		write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak + 5), (uint8_t *)(CUR_INFO.scratch + 5), sizeof(uint));
 		transition_to(CUR_TASK);
 	}
 
@@ -744,26 +742,31 @@ void task_sm_conv_lea() {
 		uint dma_pos = 0;
 		for(uint j = CUR_INFO.scratch[3]; j < cols; j = ++CUR_INFO.scratch[3]) {
 			if(j + n + common_tile_size >= dma_j) {
-			    DMA_setTransferSize(dmaConfig[1].channelSelect, load_size);
-			    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
-								(uint32_t) MAT_PTR(src, k, i + l, dma_j),
-	                      		DMA_DIRECTION_INCREMENT);
-			    DMA_setDstAddress(dmaConfig[1].channelSelect,
-			                    (uint32_t) (tsrc2 + dma_offset),
-			                    DMA_DIRECTION_INCREMENT);
-				DMA_enableTransfers(dmaConfig[1].channelSelect);
+				if(load_size <= 12) {
+					memcpy(tsrc2 + dma_offset, MAT_PTR(src, k, i + l, dma_j), sizeof(fixed) * load_size);
+					memcpy(tsrc3 + dma_offset + 1, MAT_PTR(src, k, i + l, dma_j), sizeof(fixed) * load_size);
+				} else {
+				    DMA_setTransferSize(dmaConfig[1].channelSelect, load_size);
+				    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
+									(uint32_t) MAT_PTR(src, k, i + l, dma_j),
+		                      		DMA_DIRECTION_INCREMENT);
+				    DMA_setDstAddress(dmaConfig[1].channelSelect,
+				                    (uint32_t) (tsrc2 + dma_offset),
+				                    DMA_DIRECTION_INCREMENT);
+					DMA_enableTransfers(dmaConfig[1].channelSelect);
 
-			    DMA_setTransferSize(dmaConfig[2].channelSelect, load_size);
-			    DMA_setSrcAddress(dmaConfig[2].channelSelect, 
-								(uint32_t) MAT_PTR(src, k, i + l, dma_j),
-	                      		DMA_DIRECTION_INCREMENT);
-			    DMA_setDstAddress(dmaConfig[2].channelSelect,
-			                    (uint32_t) (tsrc3 + dma_offset + 1),
-			                    DMA_DIRECTION_INCREMENT);
-				DMA_enableTransfers(dmaConfig[2].channelSelect);
+				    DMA_setTransferSize(dmaConfig[2].channelSelect, load_size);
+				    DMA_setSrcAddress(dmaConfig[2].channelSelect, 
+									(uint32_t) MAT_PTR(src, k, i + l, dma_j),
+		                      		DMA_DIRECTION_INCREMENT);
+				    DMA_setDstAddress(dmaConfig[2].channelSelect,
+				                    (uint32_t) (tsrc3 + dma_offset + 1),
+				                    DMA_DIRECTION_INCREMENT);
+					DMA_enableTransfers(dmaConfig[2].channelSelect);
 
-				DMA_startSleepTransfer(dmaConfig[1].channelSelect);
-			    DMA_startSleepTransfer(dmaConfig[2].channelSelect);
+					DMA_startSleepTransfer(dmaConfig[1].channelSelect);
+				    DMA_startSleepTransfer(dmaConfig[2].channelSelect);
+				}
 			    dma_offset += load_size;
 			    dma_j += load_size;
 			}
