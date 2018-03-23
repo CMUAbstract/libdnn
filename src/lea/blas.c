@@ -16,9 +16,10 @@
 static __fram mat_t m1 = {.data = MAT_BUFFER(0)};
 static __fram mat_t *inter1 = &m1;
 static DSPLIB_DATA(tsrc1, 2) fixed tsrc1[CONFIG_TILE_SIZE];
-static DSPLIB_DATA(tsrc2, 2) fixed tsrc2[MAT_BUFFER_SIZE];
+static DSPLIB_DATA(tsrc2, 2) fixed tsrc2[CONFIG_TILE_SIZE];
 static DSPLIB_DATA(tsrc3, 2) fixed tsrc3[MAT_BUFFER_SIZE];
-static DSPLIB_DATA(tdest, 2) fixed tdest[CONFIG_TILE_SIZE];
+static DSPLIB_DATA(tsrc4, 2) fixed tsrc4[MAT_BUFFER_SIZE];
+static DSPLIB_DATA(tdest, 2) fixed tdest[2];
 
 static __fram DMA_initParam dmaConfig[3];
 static uint DMA_initialized = 0;
@@ -92,6 +93,7 @@ void check_calibrate(){
 		DMA_initialized = 1;
 	}
 	if(tile_size != 0) return;
+	PRINTF("\r\n CALIBRATING %u", tile_size);
 	TASK_REF(task_calibrate)->info.return_task = CUR_TASK;
 	TRANSITION_TO(task_calibrate);
 }
@@ -333,9 +335,163 @@ void task_dm_mul() {
 }
 
 // Dense matrix convolution
+__fram fixed coalesced_filter[MAT_BUFFER_SIZE];
 void task_dm_conv() {
 	check_calibrate();
-	#pragma GCC warning "not yet implemented"
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *inter = inter1;
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+
+	uint rows = MAT_GET_DIM(dest, 0);
+	uint cols = MAT_GET_DIM(dest, 1);
+
+	uint srows = MAT_GET_DIM(src, 1);
+	uint scols = MAT_GET_DIM(src, 2);
+
+	uint flayers = MAT_GET_DIM(filter, 0);
+	uint frows = MAT_GET_DIM(filter, 1);
+	uint fcols = MAT_GET_DIM(filter, 2);
+	uint common_tile_size = greatest_tile_size(srows * scols, tile_size);
+	uint common_tile_size_rows = common_tile_size / cols;
+	if(common_tile_size_rows == 0) common_tile_size_rows = 1;
+	common_tile_size = common_tile_size_rows * MAT_GET_DIM(src, 2);
+	MAT_RESHAPE(inter1, rows, cols);
+
+	uint k = CUR_INFO.scratch[0];
+	uint l = CUR_INFO.scratch[1];
+	uint remaining_rows = (common_tile_size_rows < frows - l) ? common_tile_size_rows : frows - l;
+	common_tile_size = remaining_rows * scols;
+	// PRINTF("\r\n k: %u l: %u tile_size: %u remaining: %u frows: %u flayers: %u", 
+		// k, l, tile_size, remaining_rows, frows, flayers);
+
+	char state = CUR_INFO.scratch[4];
+	if(state == 0) {
+		scratch_bak[4] = 1;
+		scratch_bak[5] = 1;
+		write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak + 5), (uint8_t *)(CUR_INFO.scratch + 5), sizeof(uint));
+		transition_to(CUR_TASK);
+	} else if(state == 1 || state == 2) { // generate filter
+		memset(coalesced_filter, 0, sizeof(fixed) * (scols + common_tile_size));
+		coalesced_filter[(cols + common_tile_size)] = 0;
+		for(uint i = CUR_INFO.scratch[2]; i < remaining_rows; i = ++CUR_INFO.scratch[2]) {
+			memcpy(coalesced_filter + scols * (i + 1), MAT_PTR(filter, k, l + i, 0), sizeof(fixed) * fcols);
+		}
+		scratch_bak[2] = 0;
+		scratch_bak[4] = (state == 1) ? 3 : 4;
+		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
+		transition_to(CUR_TASK);
+	}
+
+	mat_t *tmp = dest;
+	if(CUR_INFO.scratch[5]) { // Swap
+		dest = inter;
+		inter = tmp;
+	}
+
+	if(scols + common_tile_size > 12) {
+		DMA_setTransferSize(dmaConfig[1].channelSelect, scols + common_tile_size);
+	    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
+						(uint32_t) coalesced_filter,
+                  		DMA_DIRECTION_INCREMENT);
+	    DMA_setDstAddress(dmaConfig[1].channelSelect,
+	                    (uint32_t) tsrc1,
+	                    DMA_DIRECTION_INCREMENT);
+		DMA_enableTransfers(dmaConfig[1].channelSelect);
+		DMA_startSleepTransfer(dmaConfig[1].channelSelect);
+
+		DMA_setTransferSize(dmaConfig[1].channelSelect, scols + common_tile_size);
+	    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
+						(uint32_t) coalesced_filter,
+                  		DMA_DIRECTION_INCREMENT);
+	    DMA_setDstAddress(dmaConfig[1].channelSelect,
+	                    (uint32_t) (tsrc2 + 1),
+	                    DMA_DIRECTION_INCREMENT);
+		DMA_enableTransfers(dmaConfig[1].channelSelect);
+		DMA_startSleepTransfer(dmaConfig[1].channelSelect);
+	} else {
+		memcpy(tsrc1, coalesced_filter, sizeof(fixed) * (scols + common_tile_size));
+		memcpy(tsrc2 + 1, coalesced_filter, sizeof(fixed) * (scols + common_tile_size));
+	}
+
+    msp_mac_q15_params params = {.length = common_tile_size + common_tile_size % 2};
+
+	msp_status status;
+    uint dma_i = CUR_INFO.scratch[2];
+    if(common_tile_size > 12) {
+    	DMA_setTransferSize(dmaConfig[1].channelSelect, common_tile_size);
+	    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
+						(uint32_t) MAT_PTR(src, k, dma_i + l, 0),
+                  		DMA_DIRECTION_INCREMENT);
+	    DMA_setDstAddress(dmaConfig[1].channelSelect,
+	                    (uint32_t) tsrc3,
+	                    DMA_DIRECTION_INCREMENT);
+		DMA_enableTransfers(dmaConfig[1].channelSelect);
+		DMA_startSleepTransfer(dmaConfig[1].channelSelect);
+    } else {
+    	memcpy(tsrc3, MAT_PTR(src, k, dma_i + l, 0), sizeof(fixed) * common_tile_size);
+    }
+    dma_i += remaining_rows;
+	for(uint i = CUR_INFO.scratch[2]; i < rows; i = ++CUR_INFO.scratch[2]) {
+		if(i + l + remaining_rows >= dma_i) {
+			if(scols > 12) {
+				DMA_setTransferSize(dmaConfig[1].channelSelect, scols);
+			    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
+								(uint32_t) MAT_PTR(src, k, dma_i + l, 0),
+		                  		DMA_DIRECTION_INCREMENT);
+			    DMA_setDstAddress(dmaConfig[1].channelSelect,
+			                    (uint32_t) (tsrc3 + dma_i * scols),
+			                    DMA_DIRECTION_INCREMENT);
+				DMA_enableTransfers(dmaConfig[1].channelSelect);
+				DMA_startSleepTransfer(dmaConfig[1].channelSelect);
+			} else {
+				memcpy(tsrc3 + dma_i * scols, MAT_PTR(src, k, dma_i + l, 0), sizeof(fixed) * scols);
+			}
+		    dma_i++;
+		}
+		for(uint j = CUR_INFO.scratch[3]; j < cols; j = ++CUR_INFO.scratch[3]) {
+		    fixed w = 0;
+		    if(state == 4) w = MAT_GET(inter, i, j);
+		    if(j & 0x1) {
+			    while((LEACNF1 & LEABUSY) || msp_lea_locked) __no_operation(); // Spin waiting for LEA
+		    	status = msp_mac_q15(&params, tsrc2 - j + 1 + scols, tsrc3 + i * scols, tdest);
+		    } else {
+			    while((LEACNF1 & LEABUSY) || msp_lea_locked) __no_operation(); // Spin waiting for LEA
+				status = msp_mac_q15(&params, tsrc1 - j + scols, tsrc3 + i * scols, tdest);
+	    	}
+			fixed rounded = ((*tdest >> 1) + F_K) >> F_N;
+    		w = F_ADD(w, rounded);
+    		MAT_SET(dest, w, i, j);
+		}
+		CUR_INFO.scratch[3] = 0;
+	}
+	// coalesce a filter
+	scratch_bak[0] = (l + remaining_rows == frows)? k + 1 : k; // flayers
+	scratch_bak[1] = (l + remaining_rows == frows)? 0 : l + remaining_rows; // frows
+
+	scratch_bak[2] = 0; // i
+	scratch_bak[4] = 2; // state machine
+	scratch_bak[5] = CUR_INFO.scratch[5] ^ 0x01; // swap buffer? 
+	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 5), (uint8_t *)(CUR_INFO.scratch + 5), sizeof(uint));
+	if(!(k + 1 == flayers && l + remaining_rows == frows)) transition_to(CUR_TASK);
+	if(CUR_INFO.scratch[5]) {
+		PRINTF("\r\nBuffering into proper location");
+		for(uint i = CUR_INFO.scratch[6]; i < rows; i = ++CUR_INFO.scratch[6]) {
+			for(uint j = CUR_INFO.scratch[7]; j < cols; j = ++CUR_INFO.scratch[7]) {
+				MAT_SET(inter, MAT_GET(dest, i, j), i, j);
+			}
+			CUR_INFO.scratch[7] = 0;
+		}
+	}
+	POP_STACK(mat_stack, 3);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_blas);
 }
 
 void task_dm_conv_same() {
@@ -407,7 +563,6 @@ void task_sm_mul() {
 	TRANSITION_TO(task_cleanup_blas);
 }
 
-__fram fixed coalesced_filter[CONFIG_TILE_SIZE];
 void task_sm_conv() {
 	check_calibrate();
 	mat_t *src = PEEK_STACK(mat_stack, 0);
@@ -650,15 +805,15 @@ void task_sm_conv_same() {
 		for(uint j = CUR_INFO.scratch[3]; j < cols; j = ++CUR_INFO.scratch[3]) {
 			if(j + n + common_tile_size >= dma_j) {
 				if(load_size <= 12) {
-					memcpy(tsrc2 + dma_offset, MAT_PTR(src, k, i + l, dma_j), sizeof(fixed) * load_size);
-					memcpy(tsrc3 + dma_offset + 1, MAT_PTR(src, k, i + l, dma_j), sizeof(fixed) * load_size);
+					memcpy(tsrc3 + dma_offset, MAT_PTR(src, k, i + l, dma_j), sizeof(fixed) * load_size);
+					memcpy(tsrc4 + dma_offset + 1, MAT_PTR(src, k, i + l, dma_j), sizeof(fixed) * load_size);
 				} else {
 				    DMA_setTransferSize(dmaConfig[1].channelSelect, load_size);
 				    DMA_setSrcAddress(dmaConfig[1].channelSelect, 
 									(uint32_t) MAT_PTR(src, k, i + l, dma_j),
 		                      		DMA_DIRECTION_INCREMENT);
 				    DMA_setDstAddress(dmaConfig[1].channelSelect,
-				                    (uint32_t) (tsrc2 + dma_offset),
+				                    (uint32_t) (tsrc3 + dma_offset),
 				                    DMA_DIRECTION_INCREMENT);
 					DMA_enableTransfers(dmaConfig[1].channelSelect);
 
@@ -667,7 +822,7 @@ void task_sm_conv_same() {
 									(uint32_t) MAT_PTR(src, k, i + l, dma_j),
 		                      		DMA_DIRECTION_INCREMENT);
 				    DMA_setDstAddress(dmaConfig[2].channelSelect,
-				                    (uint32_t) (tsrc3 + dma_offset + 1),
+				                    (uint32_t) (tsrc4 + dma_offset + 1),
 				                    DMA_DIRECTION_INCREMENT);
 					DMA_enableTransfers(dmaConfig[2].channelSelect);
 
@@ -681,11 +836,11 @@ void task_sm_conv_same() {
 		    if(zero == 2) w = MAT_GET(inter, i, j);
 		    if(j & 0x1) {
 			    while((LEACNF1 & LEABUSY) || msp_lea_locked) __no_operation(); // Spin waiting for LEA
-		    	msp_mac_q15(&params, tsrc1, tsrc3 + dma_pos + 2, tdest);
+		    	msp_mac_q15(&params, tsrc1, tsrc4 + dma_pos + 2, tdest);
 	    		dma_pos += 2;
 		    } else {
 			    while((LEACNF1 & LEABUSY) || msp_lea_locked) __no_operation(); // Spin waiting for LEA
-				msp_mac_q15(&params, tsrc1, tsrc2 + dma_pos, tdest);
+				msp_mac_q15(&params, tsrc1, tsrc3 + dma_pos, tdest);
 			}
 			fixed rounded = ((*tdest >> 1) + F_K) >> F_N;
 			if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {

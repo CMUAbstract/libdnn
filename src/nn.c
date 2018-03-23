@@ -46,10 +46,10 @@ void task_d_conv() {
 	mat_t *b = PEEK_STACK(mat_stack, 3);
 	mat_reshape(inter, dest->len_dims, dest->dims);
 	uint filters = MAT_GET_DIM(w, 0);
-	task_t *target = TASK_REF(task_sm_conv);
+	task_t *target = TASK_REF(task_dm_conv);
 	if(same_padding) {
 		PRINTF("\r\n    Using same padding");
-		target = TASK_REF(task_sm_conv_same);
+		target = TASK_REF(task_dm_conv_same);
 	}
 	if(CUR_INFO.scratch[0] == 0) { // Do convolution on all filters
 		uint i = CUR_INFO.scratch[1];
