@@ -14,7 +14,9 @@
 #include "misc.h"
 
 static __fram mat_t m1 = {.data = MAT_BUFFER(0)};
+static __fram mat_t m2 = {.data = MAT_BUFFER(1)};
 static __fram mat_t *inter1 = &m1;
+static __fram mat_t *inter2 = &m2;
 static DSPLIB_DATA(tsrc1, 2) fixed tsrc1[CONFIG_TILE_SIZE];
 static DSPLIB_DATA(tsrc2, 2) fixed tsrc2[CONFIG_TILE_SIZE];
 static DSPLIB_DATA(tsrc3, 2) fixed tsrc3[MAT_BUFFER_SIZE];
@@ -93,7 +95,6 @@ void check_calibrate(){
 		DMA_initialized = 1;
 	}
 	if(tile_size != 0) return;
-	PRINTF("\r\n CALIBRATING %u", tile_size);
 	TASK_REF(task_calibrate)->info.return_task = CUR_TASK;
 	TRANSITION_TO(task_calibrate);
 }
@@ -563,6 +564,398 @@ void task_sm_mul() {
 	TRANSITION_TO(task_cleanup_blas);
 }
 
+#if 1
+void task_sm_conv() {
+	check_calibrate();
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *inter = inter1;
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+
+	uint slayers = MAT_GET_DIM(src, 0); // So metal
+	uint srows = MAT_GET_DIM(src, 1);
+	uint scols = MAT_GET_DIM(src, 2);
+
+	uint rows = MAT_GET_DIM(dest, 0);
+	uint cols = MAT_GET_DIM(dest, 0);
+
+	uint frows = filter->sparse.dims[1];
+	uint fcols = filter->sparse.dims[2];
+	uint total_elements = MAT_GET_DIM(filter, 0);
+
+	uint common_tile_size = greatest_tile_size(scols, tile_size);
+	uint even_offset = common_tile_size % 2;
+	uint feven_offset = (fcols % 2) ^ 0x01;
+	MAT_RESHAPE(inter1, rows, cols);
+
+	uint idx = CUR_INFO.scratch[0];
+	uint pos = CUR_INFO.scratch[1];
+	char state = CUR_INFO.scratch[4];
+
+	if(state == 0) { // Generate Initial Filter
+		memset(coalesced_filter, 0, sizeof(filter) * (fcols + feven_offset));
+		scratch_bak[0] = filter->sparse.offsets[pos];
+		scratch_bak[1] = pos;
+		uint offset = scratch_bak[0] % fcols;
+		uint init_row = scratch_bak[0] / fcols;
+		coalesced_filter[fcols - offset - feven_offset] = MAT_GET(filter, scratch_bak[1]) << SHIFT;
+		for(uint i = 0; i < fcols; i++) {
+			if((scratch_bak[0] + filter->sparse.offsets[scratch_bak[1] + 1]) / fcols != init_row || 
+				scratch_bak[1] + 1 >= total_elements) break;
+
+			scratch_bak[1]++;
+			scratch_bak[0] += filter->sparse.offsets[scratch_bak[1]];
+			offset = scratch_bak[0] % fcols;
+			coalesced_filter[fcols - offset - feven_offset] = MAT_GET(filter, scratch_bak[1]) << SHIFT;
+		}
+		scratch_bak[4] = 2;
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
+		transition_to(CUR_TASK);
+	}
+
+	mat_t *tmp = dest;
+	if(CUR_INFO.scratch[5]) { // Swap
+		dest = inter;
+		inter = tmp;
+	}
+
+    uint k = idx / (fcols * frows); // Layers
+	uint l = (idx % (fcols * frows)) / fcols; // Rows
+	// PRINTF("\r\n tile_size: %u length: %u tapLength: %u k: %u l: %u", 
+		// common_tile_size, common_tile_size + even_offset, fcols + fcols % 2, k, l);
+
+	msp_status status;
+	msp_fir_q15_params params_fir = {.length = common_tile_size + even_offset, 
+									.tapLength = (fcols + fcols % 2), .coeffs = tsrc1};
+	msp_add_q15_params params_add = {.length = common_tile_size + even_offset};
+	uint fsize = fcols + fcols % 2;
+	if(fsize > 12) {
+		DMA_setTransferSize(dmaConfig[0].channelSelect, fsize);
+	    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+	                      (uint32_t) (coalesced_filter),
+	                      DMA_DIRECTION_INCREMENT);
+
+	    DMA_setDstAddress(dmaConfig[0].channelSelect,
+	                      (uint32_t) (tsrc1),
+	                      DMA_DIRECTION_INCREMENT);
+	    DMA_enableTransfers(dmaConfig[0].channelSelect);
+	    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+	} else {
+		memcpy(tsrc1, coalesced_filter, sizeof(fixed) * (fcols + fcols % 2));
+	}
+
+	if(common_tile_size > 12) {
+		for(uint i = CUR_INFO.scratch[2]; i < rows; i = ++CUR_INFO.scratch[2]) {
+			for(uint j = CUR_INFO.scratch[3]; j < scols; j = (CUR_INFO.scratch[3] += common_tile_size)) {
+				DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+			    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+			                      (uint32_t) (MAT_PTR(src, k, i + l, j)),
+			                      DMA_DIRECTION_INCREMENT);
+
+			    DMA_setDstAddress(dmaConfig[0].channelSelect,
+			                      (uint32_t) (tsrc3),
+			                      DMA_DIRECTION_INCREMENT);
+			    DMA_enableTransfers(dmaConfig[0].channelSelect);
+			    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+				if(even_offset) tsrc3[common_tile_size + even_offset] = 0;
+				status = msp_fir_q15(&params_fir, tsrc3, tsrc2);
+				if(state == 3) {
+					DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+				    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) (MAT_PTR(inter, i, j)),
+				                      DMA_DIRECTION_INCREMENT);
+
+				    DMA_setDstAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) (tsrc4),
+				                      DMA_DIRECTION_INCREMENT);
+				    DMA_enableTransfers(dmaConfig[0].channelSelect);
+				    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+					if(even_offset) tsrc4[common_tile_size + even_offset] = 0;
+					status = msp_add_q15(&params_add, tsrc2, tsrc4, tsrc3);
+					DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+				    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) tsrc3,
+				                      DMA_DIRECTION_INCREMENT);
+
+				    DMA_setDstAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) (MAT_PTR(dest, i, j)),
+				                      DMA_DIRECTION_INCREMENT);
+				    DMA_enableTransfers(dmaConfig[0].channelSelect);
+				    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+				} else {
+					DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+				    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) tsrc2,
+				                      DMA_DIRECTION_INCREMENT);
+
+				    DMA_setDstAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) (MAT_PTR(dest, i, j)),
+				                      DMA_DIRECTION_INCREMENT);
+				    DMA_enableTransfers(dmaConfig[0].channelSelect);
+				    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+				}
+			}
+			CUR_INFO.scratch[3] = 0;
+		}
+	} else {
+		for(uint i = CUR_INFO.scratch[2]; i < rows; i = ++CUR_INFO.scratch[2]) {
+			for(uint j = CUR_INFO.scratch[3]; j < scols; j = (CUR_INFO.scratch[3] += common_tile_size)) {
+				memcpy(tsrc3, MAT_PTR(src, k, i + l, j), sizeof(fixed) * common_tile_size);
+				if(even_offset) tsrc3[common_tile_size + even_offset] = 0;
+				status = msp_fir_q15(&params_fir, tsrc3, tsrc2);
+				if(state == 3) {
+					memcpy(tsrc4, MAT_PTR(inter, i, j), sizeof(fixed) * common_tile_size);
+					if(even_offset) tsrc4[common_tile_size + even_offset] = 0;
+					status = msp_add_q15(&params_add, tsrc2, tsrc4, tsrc3);
+					memcpy(MAT_PTR(dest, i, j), tsrc3, sizeof(fixed) * common_tile_size);
+				} else {
+					memcpy(MAT_PTR(dest, i, j), tsrc2, sizeof(fixed) * common_tile_size);
+				}
+			}
+			CUR_INFO.scratch[3] = 0;
+		}
+	}
+
+	// Coalesced Filter
+	memset(coalesced_filter, 0, sizeof(filter) * fsize);
+	scratch_bak[0] = idx + filter->sparse.offsets[pos + 1];
+	scratch_bak[1] = pos + 1;
+	uint offset = scratch_bak[0] % fcols;
+	uint init_row = scratch_bak[0] / fcols;
+	coalesced_filter[fcols - offset - feven_offset] = MAT_GET(filter, scratch_bak[1]) << SHIFT;
+	for(uint i = 0; i < fcols; i++) {
+		if((scratch_bak[0] + filter->sparse.offsets[scratch_bak[1] + 1]) / fcols != init_row || 
+			scratch_bak[1] + 1 >= total_elements) break;
+
+		scratch_bak[1]++;
+		scratch_bak[0] += filter->sparse.offsets[scratch_bak[1]];
+		offset = scratch_bak[0] % fcols;
+		coalesced_filter[fcols - offset - feven_offset] = MAT_GET(filter, scratch_bak[1]) << SHIFT;
+	}
+
+	scratch_bak[2] = 0;
+	scratch_bak[4] = 3;
+	scratch_bak[5] = CUR_INFO.scratch[5] ^ 0x01;
+	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 5), (uint8_t *)(CUR_INFO.scratch + 5), sizeof(uint));
+	if(pos < total_elements - 1) transition_to(CUR_TASK);
+	if(CUR_INFO.scratch[5]) {
+		PRINTF("\r\nBuffering into proper location");
+		for(uint i = CUR_INFO.scratch[6]; i < rows; i = ++CUR_INFO.scratch[6]) {
+			for(uint j = CUR_INFO.scratch[7]; j < cols; j = ++CUR_INFO.scratch[7]) {
+				MAT_SET(inter, MAT_GET(dest, i, j), i, j);
+			}
+			CUR_INFO.scratch[7] = 0;
+		}
+	}
+	POP_STACK(mat_stack, 3);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_blas);
+}
+
+void task_sm_conv_same() {
+	check_calibrate();
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *inter = inter1;
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+
+	uint slayers = MAT_GET_DIM(src, 0); // So metal
+	uint srows = MAT_GET_DIM(src, 1);
+	uint scols = MAT_GET_DIM(src, 2);
+
+	uint rows = MAT_GET_DIM(dest, 0);
+	uint cols = MAT_GET_DIM(dest, 0);
+
+	uint frows = filter->sparse.dims[1];
+	uint fcols = filter->sparse.dims[2];
+	uint total_elements = MAT_GET_DIM(filter, 0);
+
+	uint common_tile_size = greatest_tile_size(scols, tile_size);
+	uint even_offset = common_tile_size % 2;
+	uint feven_offset = (fcols % 2) ^ 0x01;
+	MAT_RESHAPE(inter1, rows, cols);
+
+	uint idx = CUR_INFO.scratch[0];
+	uint pos = CUR_INFO.scratch[1];
+	char state = CUR_INFO.scratch[4];
+
+	if(state == 0) { // Generate Initial Filter
+		memset(coalesced_filter, 0, sizeof(filter) * (fcols + feven_offset));
+		scratch_bak[0] = filter->sparse.offsets[pos];
+		scratch_bak[1] = pos;
+		uint offset = scratch_bak[0] % fcols;
+		uint init_row = scratch_bak[0] / fcols;
+		coalesced_filter[fcols - offset - feven_offset] = MAT_GET(filter, scratch_bak[1]) << SHIFT;
+		for(uint i = 0; i < fcols; i++) {
+			if((scratch_bak[0] + filter->sparse.offsets[scratch_bak[1] + 1]) / fcols != init_row || 
+				scratch_bak[1] + 1 >= total_elements) break;
+
+			scratch_bak[1]++;
+			scratch_bak[0] += filter->sparse.offsets[scratch_bak[1]];
+			offset = scratch_bak[0] % fcols;
+			coalesced_filter[fcols - offset - feven_offset] = MAT_GET(filter, scratch_bak[1]) << SHIFT;
+		}
+		scratch_bak[4] = 2;
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
+		transition_to(CUR_TASK);
+	}
+
+	mat_t *tmp = dest;
+	if(CUR_INFO.scratch[5]) { // Swap
+		dest = inter;
+		inter = tmp;
+	}
+
+    uint k = idx / (fcols * frows); // Layers
+	uint l = (idx % (fcols * frows)) / fcols; // Rows
+	// PRINTF("\r\n tile_size: %u length: %u tapLength: %u k: %u l: %u", 
+		// common_tile_size, common_tile_size + even_offset, fcols + fcols % 2, k, l);
+
+	msp_status status;
+	msp_fir_q15_params params_fir = {.length = common_tile_size + even_offset, 
+									.tapLength = (fcols + fcols % 2), .coeffs = tsrc1};
+	msp_add_q15_params params_add = {.length = common_tile_size + even_offset};
+	uint fsize = fcols + fcols % 2;
+	if(fsize > 12) {
+		DMA_setTransferSize(dmaConfig[0].channelSelect, fsize);
+	    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+	                      (uint32_t) (coalesced_filter),
+	                      DMA_DIRECTION_INCREMENT);
+
+	    DMA_setDstAddress(dmaConfig[0].channelSelect,
+	                      (uint32_t) (tsrc1),
+	                      DMA_DIRECTION_INCREMENT);
+	    DMA_enableTransfers(dmaConfig[0].channelSelect);
+	    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+	} else {
+		memcpy(tsrc1, coalesced_filter, sizeof(fixed) * fsize);
+	}
+
+	if(common_tile_size > 12) {
+		for(uint i = CUR_INFO.scratch[2]; i < rows; i = ++CUR_INFO.scratch[2]) {
+			if(i + l > rows) {
+				memset(tsrc1, 0, sizeof(fixed) * fsize);
+			}
+			for(uint j = CUR_INFO.scratch[3]; j < scols; j = (CUR_INFO.scratch[3] += common_tile_size)) {
+				DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+			    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+			                      (uint32_t) (MAT_PTR(src, k, i + l, j)),
+			                      DMA_DIRECTION_INCREMENT);
+
+			    DMA_setDstAddress(dmaConfig[0].channelSelect,
+			                      (uint32_t) (tsrc3),
+			                      DMA_DIRECTION_INCREMENT);
+			    DMA_enableTransfers(dmaConfig[0].channelSelect);
+			    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+				if(even_offset) tsrc3[common_tile_size + even_offset] = 0;
+				status = msp_fir_q15(&params_fir, tsrc3, tsrc2);
+				if(state == 3) {
+					DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+				    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) (MAT_PTR(inter, i, j)),
+				                      DMA_DIRECTION_INCREMENT);
+
+				    DMA_setDstAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) (tsrc4),
+				                      DMA_DIRECTION_INCREMENT);
+				    DMA_enableTransfers(dmaConfig[0].channelSelect);
+				    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+					if(even_offset) tsrc4[common_tile_size + even_offset] = 0;
+					status = msp_add_q15(&params_add, tsrc2, tsrc4, tsrc3);
+					DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+				    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) tsrc3,
+				                      DMA_DIRECTION_INCREMENT);
+
+				    DMA_setDstAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) (MAT_PTR(dest, i, j)),
+				                      DMA_DIRECTION_INCREMENT);
+				    DMA_enableTransfers(dmaConfig[0].channelSelect);
+				    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+				} else {
+					DMA_setTransferSize(dmaConfig[0].channelSelect, common_tile_size);
+				    DMA_setSrcAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) tsrc2,
+				                      DMA_DIRECTION_INCREMENT);
+
+				    DMA_setDstAddress(dmaConfig[0].channelSelect,
+				                      (uint32_t) (MAT_PTR(dest, i, j)),
+				                      DMA_DIRECTION_INCREMENT);
+				    DMA_enableTransfers(dmaConfig[0].channelSelect);
+				    DMA_startSleepTransfer(dmaConfig[0].channelSelect);
+				}
+			}
+			CUR_INFO.scratch[3] = 0;
+		}
+	} else {
+		for(uint i = CUR_INFO.scratch[2]; i < rows; i = ++CUR_INFO.scratch[2]) {
+			for(uint j = CUR_INFO.scratch[3]; j < scols; j = (CUR_INFO.scratch[3] += common_tile_size)) {
+				memcpy(tsrc3, MAT_PTR(src, k, i + l, j), sizeof(fixed) * common_tile_size);
+				if(even_offset) tsrc3[common_tile_size + even_offset] = 0;
+				status = msp_fir_q15(&params_fir, tsrc3, tsrc2);
+				if(state == 3) {
+					memcpy(tsrc4, MAT_PTR(inter, i, j), sizeof(fixed) * common_tile_size);
+					if(even_offset) tsrc4[common_tile_size + even_offset] = 0;
+					status = msp_add_q15(&params_add, tsrc2, tsrc4, tsrc3);
+					memcpy(MAT_PTR(dest, i, j), tsrc3, sizeof(fixed) * common_tile_size);
+				} else {
+					memcpy(MAT_PTR(dest, i, j), tsrc2, sizeof(fixed) * common_tile_size);
+				}
+			}
+			CUR_INFO.scratch[3] = 0;
+		}
+	}
+
+	// Coalesced Filter
+	memset(coalesced_filter, 0, sizeof(filter) * fsize);
+	scratch_bak[0] = idx + filter->sparse.offsets[pos + 1];
+	scratch_bak[1] = pos + 1;
+	uint offset = scratch_bak[0] % fcols;
+	uint init_row = scratch_bak[0] / fcols;
+	coalesced_filter[fcols - offset - feven_offset] = MAT_GET(filter, scratch_bak[1]) << SHIFT;
+	for(uint i = 0; i < fcols; i++) {
+		if((scratch_bak[0] + filter->sparse.offsets[scratch_bak[1] + 1]) / fcols != init_row || 
+			scratch_bak[1] + 1 >= total_elements) break;
+
+		scratch_bak[1]++;
+		scratch_bak[0] += filter->sparse.offsets[scratch_bak[1]];
+		offset = scratch_bak[0] % fcols;
+		coalesced_filter[fcols - offset - feven_offset] = MAT_GET(filter, scratch_bak[1]) << SHIFT;
+	}
+
+	scratch_bak[2] = 0;
+	scratch_bak[4] = 3;
+	scratch_bak[5] = CUR_INFO.scratch[5] ^ 0x01;
+	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 4), (uint8_t *)(CUR_INFO.scratch + 4), sizeof(uint));
+	write_to_gbuf((uint8_t *)(scratch_bak + 5), (uint8_t *)(CUR_INFO.scratch + 5), sizeof(uint));
+	if(pos < total_elements - 1) transition_to(CUR_TASK);
+	if(CUR_INFO.scratch[5]) {
+		PRINTF("\r\nBuffering into proper location");
+		for(uint i = CUR_INFO.scratch[6]; i < rows; i = ++CUR_INFO.scratch[6]) {
+			for(uint j = CUR_INFO.scratch[7]; j < cols; j = ++CUR_INFO.scratch[7]) {
+				MAT_SET(inter, MAT_GET(dest, i, j), i, j);
+			}
+			CUR_INFO.scratch[7] = 0;
+		}
+	}
+	POP_STACK(mat_stack, 3);
+	last_task = CUR_TASK;
+	TRANSITION_TO(task_cleanup_blas);
+}
+
+#else
+
 void task_sm_conv() {
 	check_calibrate();
 	mat_t *src = PEEK_STACK(mat_stack, 0);
@@ -724,7 +1117,6 @@ void task_sm_conv() {
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_blas);
 }
-
 void task_sm_conv_same() {
 	check_calibrate();
 	mat_t *src = PEEK_STACK(mat_stack, 0);
@@ -889,6 +1281,7 @@ void task_sm_conv_same() {
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_blas);
 }
+#endif
 
 void __attribute__((interrupt(DMA_VECTOR)))dmaIsrHandler(void) {
     switch (__even_in_range(DMAIV, DMAIV_DMA2IFG)) {

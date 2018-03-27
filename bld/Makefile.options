@@ -9,5 +9,9 @@ ifneq ($(LIBDNN_CONSOLE),)
 override CFLAGS += -DCONFIG_CONSOLE=1
 endif
 
+ifneq ($(LIBDNN_LEA),)
+override CFLAGS += -DCONFIG_LEA=1
+endif
+
 override CFLAGS += -DCONFIG_BITWIDTH=$(LIBDNN_BITWIDTH)
 override CFLAGS += -DCONFIG_TILE_SIZE=$(LIBDNN_TILE_SIZE)

@@ -63,9 +63,9 @@ void task_filter() {
 	uint layers = MAT_GET_DIM(src, 0);
 	uint rows = MAT_GET_DIM(src, 1);
 	uint cols = MAT_GET_DIM(src, 2);
-	for(uint i = 0; i < layers; i = ++CUR_INFO.scratch[0]) {
-		for(uint j = 0; j < rows; j = ++CUR_INFO.scratch[1]) {
-			for(uint k = 0; k < cols; k = ++CUR_INFO.scratch[2]) {
+	for(uint i = 0; i < layers; i = (CUR_INFO.scratch[0] += stride[0])) {
+		for(uint j = 0; j < rows; j = (CUR_INFO.scratch[1] += stride[1])) {
+			for(uint k = 0; k < cols; k = (CUR_INFO.scratch[2] += stride[2])) {
 				fixed w = MAT_GET(src, i, j, k);
 				MAT_SET(dest, w, i / stride[0], j / stride[1], k / stride[2]);
 			}

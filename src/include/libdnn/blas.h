@@ -4,6 +4,7 @@
 #include "types.h"
 
 #define TASK_UID_BLAS_OFFSET 10
+#define SHIFT 5
 
 extern uint stride[3];
 
