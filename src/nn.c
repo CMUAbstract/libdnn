@@ -89,6 +89,7 @@ void task_d_conv() {
 }
 
 #ifdef CONFIG_LEA
+// #if 0
 #pragma GCC warning "Using LEA Backend"
 void task_s_conv() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);

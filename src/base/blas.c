@@ -10,6 +10,7 @@
 #include "fixed.h"
 #include "mat.h"
 #include "misc.h"
+#include "profile.h"
 
 // Public tasks
 TASK(TASK_UID_BLAS_OFFSET, task_ds_zero);
@@ -45,6 +46,11 @@ void task_ds_add() {
 	uint cols = MAT_GET_DIM(src, 1);
 	for(uint i = 0; i < rows; i++) {
 		for(uint j = 0; j < cols; j++) {
+			inc_addr_add(2);
+			inc_addr_mul(2);
+			inc_add(1);
+			inc_ld(2);
+			inc_st(1);
 			fixed w = F_ADD(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}
@@ -63,6 +69,11 @@ void task_ds_mul() {
 	uint cols = MAT_GET_DIM(src, 1);
 	for(uint i = 0; i < rows; i++) {
 		for(uint j = 0; j < cols; j++) {
+			inc_addr_add(2);
+			inc_addr_mul(2);
+			inc_mul(1);
+			inc_ld(2);
+			inc_st(1);
 			fixed w = F_MUL(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}
@@ -98,6 +109,9 @@ void task_ds_zero() {
 	uint cols = MAT_GET_DIM(src, 1);
 	for(uint i = 0; i < rows; i++) {
 		for(uint j = 0; j < cols; j++) {
+			inc_addr_add(1);
+			inc_addr_mul(1);
+			inc_st(1);
 			MAT_SET(dest, 0, i, j);
 		}
 	}
@@ -115,6 +129,11 @@ void task_dm_add() {
 	uint cols = MAT_GET_DIM(src, 1);
 	for(uint i = 0; i < rows; i++) {
 		for(uint j = 0; j < cols; j++) {
+			inc_addr_add(2);
+			inc_addr_mul(2);
+			inc_add(1);
+			inc_ld(2);
+			inc_st(1);
 			fixed w = F_ADD(MAT_GET(src, i, j), MAT_GET(filter, i, j));
 			MAT_SET(dest, w, i, j);
 		}
@@ -136,9 +155,17 @@ void task_dm_mul() {
 		for(uint k = 0; k < dcols; k++) {
 			fixed w = 0;
 			for(uint j = 0; j < cols; j++) {
+				inc_addr_add(2);
+				inc_addr_mul(2);
+				inc_mul(1);
+				inc_add(1);
+				inc_ld(3);
 				fixed tmp = F_MUL(MAT_GET(filter, i, j), MAT_GET(src, j, k));
 				w = F_ADD(w, tmp);
 			}
+			inc_addr_add(1);
+			inc_addr_mul(1);
+			inc_st(1);
 			MAT_SET(dest, w, i, k);
 		}
 	}
@@ -236,18 +263,30 @@ void task_sm_mul() {
 	char zero = 1;
 
 	while(pos < total_elements) {
+		inc_addr_add(2);
+		inc_addr_mul(1);
 		k += filter->sparse.offsets[pos];
 		if(k / cols > 0) zero = 1;
 		i += k / cols;
 		k %= cols;
 		// PRINTF("\r\n i: %u k: %u pos: %u val: %i", i, k, pos, MAT_GET(filter, pos));
 		for(uint j = 0; j < dcols; j++) {
+			inc_addr_add(3);
+			inc_addr_mul(2);
+			inc_mul(1);
+			inc_ld(2);
+			inc_st(1);
 			fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, j));
 			if(!zero) {
+				inc_addr_add(1);
+				inc_addr_mul(1);
+				inc_ld(1);
+				inc_add(1);
 				w = F_ADD(w, MAT_GET(dest, i, j));
 			}
 			MAT_SET(dest, w, i, j);
 		}
+		inc_addr_add(1);
 		pos++;
 		zero = 0;
 	}
@@ -272,19 +311,56 @@ void task_sm_conv() {
 	uint pos = 0;
 	char zero = 1;
 	while(pos < total_elements) {
+		inc_addr_add(1);
 		idx += filter->sparse.offsets[pos];
 		uint k = idx / (fcols * frows); // Layers
 		uint l = (idx % (fcols * frows)) / fcols; // Rows
+		inc_addr_mul(2);
 		uint n = idx % fcols; // Cols
 		// PRINTF("\r\n k: %u l: %u n: %u idx: %u pos: %u val: %i", k, l, n, idx, pos, MAT_GET(filter, pos));
-		for(uint i = 0; i < rows; i++) {
-			for(uint j = 0; j < cols; j++) {
-				fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
-				w = (zero) ? w : F_ADD(w, MAT_GET(dest, i, j)); // Zero
-				MAT_SET(dest, w, i, j);
+		if(stride[1] + stride[2] > 2) {
+			uint i_stride = 0;
+			for(uint i = 0; i < rows * stride[1]; i += stride[1]) {
+				uint j_stride = 0;
+				for(uint j = 0; j < cols * stride[2]; j += stride[2]) {
+					inc_addr_add(5);
+					inc_addr_mul(3);
+					inc_mul(1);
+					inc_ld(2);
+					inc_st(1);
+					if(!zero) {
+						inc_addr_mul(1);
+						inc_addr_add(1);
+						inc_ld(1);
+					}
+					fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
+					w = (zero) ? w : F_ADD(w, MAT_GET(dest, i_stride, j_stride)); // Zero
+					MAT_SET(dest, w, i_stride, j_stride);
+					j_stride++;
+				}
+				i_stride++;
+			}
+		} else {
+			for(uint i = 0; i < rows; i++) {
+				for(uint j = 0; j < cols; j++) {
+					inc_addr_add(5);
+					inc_addr_mul(3);
+					inc_mul(1);
+					inc_ld(2);
+					inc_st(1);
+					if(!zero) {
+						inc_addr_mul(1);
+						inc_addr_add(1);
+						inc_ld(1);
+					}
+					fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
+					w = (zero) ? w : F_ADD(w, MAT_GET(dest, i, j)); // Zero
+					MAT_SET(dest, w, i, j);
+				}
 			}
 		}
 		zero = 0;
+		inc_addr_add(1);
 		pos++;
 	}
 	POP_STACK(mat_stack, 3);
@@ -311,18 +387,58 @@ void task_sm_conv_same() {
 		uint k = idx / (fcols * frows); // Layers
 		uint l = (idx % (fcols * frows)) / fcols; // Rows
 		uint n = idx % fcols; // Cols
+		inc_addr_mul(2);
 		// PRINTF("\r\n k: %u l: %u n: %u idx: %u pos: %u val: %i", k, l, n, idx, pos, MAT_GET(filter, pos));
-		for(uint i = 0; i < rows; i++) {
-			for(uint j = 0; j < cols; j++) {
-				fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
-				if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {
-					w = 0;
+		if(stride[1] + stride[2] > 2) {
+			uint i_stride = 0;
+			for(uint i = 0; i < rows * stride[1]; i += stride[1]) {
+				uint j_stride = 0;
+				for(uint j = 0; j < cols * stride[2]; j += stride[2]) {
+					fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
+					if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {
+						w = 0;
+					}
+					inc_addr_add(5);
+					inc_addr_mul(3);
+					inc_mul(1);
+					inc_ld(2);
+					inc_st(1);
+					if(!zero) {
+						inc_addr_mul(1);
+						inc_addr_add(1);
+						inc_add(1);
+						inc_ld(1);
+					}
+					w = (zero) ? w : F_ADD(w, MAT_GET(dest, i_stride, j_stride)); // Zero
+					MAT_SET(dest, w, i_stride, j_stride);
+					j_stride++;
 				}
-				w = (zero) ? w : F_ADD(w, MAT_GET(dest, i, j)); // Zero
-				MAT_SET(dest, w, i, j);
+				i_stride++;
+			}
+		} else {
+			for(uint i = 0; i < rows; i++) {
+				for(uint j = 0; j < cols; j++) {
+					fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
+					if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {
+						w = 0;
+					}
+					inc_addr_add(5);
+					inc_addr_mul(3);
+					inc_mul(1);
+					inc_ld(2);
+					inc_st(1);
+					if(!zero) {
+						inc_addr_mul(1);
+						inc_addr_add(1);
+						inc_ld(1);
+					}
+					w = (zero) ? w : F_ADD(w, MAT_GET(dest, i, j)); // Zero
+					MAT_SET(dest, w, i, j);
+				}
 			}
 		}
 		zero = 0;
+		inc_addr_add(1);
 		pos++;
 	}
 	POP_STACK(mat_stack, 3);

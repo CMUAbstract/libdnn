@@ -3,6 +3,9 @@
 #include <libalpaca/alpaca.h>
 #include "types.h"
 
+#define DMA_ENABLE || 1
+// #define DMA_ENABLE && 1
+// #define DMA_ENABLE && 0
 #define TASK_UID_BLAS_OFFSET 10
 #define SHIFT 5
 

@@ -10,6 +10,7 @@
 #include "fixed.h"
 #include "mat.h"
 #include "misc.h"
+#include "profile.h"
 
 static __fram mat_t m1 = {.data = MAT_BUFFER(0)};
 static __fram mat_t *inter1 = &m1;
@@ -71,11 +72,17 @@ void task_ds_add() {
 	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 	for(uint i = CUR_INFO.scratch[0]; i < CUR_INFO.scratch[0] + tile_size_y; i++) {
 		for(uint j = CUR_INFO.scratch[1]; j < CUR_INFO.scratch[1] + tile_size_x; j++) {
+			inc_addr_add(2);
+			inc_addr_mul(2);
+			inc_add(1);
+			inc_ld(2);
+			inc_st(1);
 			fixed w = F_ADD(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}
 	}
 	uint j = CUR_INFO.scratch[1];
+	inc_addr_add(1);
 	scratch_bak[0] = (j + tile_size_x == cols) ? CUR_INFO.scratch[0] + tile_size_y : CUR_INFO.scratch[0];
 	scratch_bak[1] = (j + tile_size_x == cols) ? 0 : CUR_INFO.scratch[1] + tile_size_x;
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
@@ -97,11 +104,17 @@ void task_ds_mul() {
 	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 	for(uint i = CUR_INFO.scratch[0]; i < CUR_INFO.scratch[0] + tile_size_y; i++) {
 		for(uint j = CUR_INFO.scratch[1]; j < CUR_INFO.scratch[1] + tile_size_x; j++) {
+			inc_addr_add(2);
+			inc_addr_mul(2);
+			inc_mul(1);
+			inc_ld(2);
+			inc_st(1);
 			fixed w = F_MUL(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}
 	}
 	uint j = CUR_INFO.scratch[1];
+	inc_addr_add(1);
 	scratch_bak[0] = (j + tile_size_x == cols) ? CUR_INFO.scratch[0] + tile_size_y : CUR_INFO.scratch[0];
 	scratch_bak[1] = (j + tile_size_x == cols) ? 0 : CUR_INFO.scratch[1] + tile_size_x;
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
@@ -148,10 +161,14 @@ void task_ds_zero() {
 	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 	for(uint i = CUR_INFO.scratch[0]; i < CUR_INFO.scratch[0] + tile_size_y; i++) {
 		for(uint j = CUR_INFO.scratch[1]; j < CUR_INFO.scratch[1] + tile_size_x; j++) {
+			inc_addr_add(1);
+			inc_addr_mul(1);
+			inc_st(1);
 			MAT_SET(dest, 0, i, j);
 		}
 	}
 	uint j = CUR_INFO.scratch[1];
+	inc_addr_add(1);
 	scratch_bak[0] = (j + tile_size_x == cols) ? CUR_INFO.scratch[0] + tile_size_y : CUR_INFO.scratch[0];
 	scratch_bak[1] = (j + tile_size_x == cols) ? 0 : CUR_INFO.scratch[1] + tile_size_x;
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
@@ -173,11 +190,17 @@ void task_dm_add() {
 	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 	for(uint i = CUR_INFO.scratch[0]; i < CUR_INFO.scratch[0] + tile_size_y; i++) {
 		for(uint j = CUR_INFO.scratch[1]; j < CUR_INFO.scratch[1] + tile_size_x; j++) {
+			inc_addr_add(2);
+			inc_addr_mul(2);
+			inc_add(1);
+			inc_ld(2);
+			inc_st(1);	
 			fixed w = F_ADD(MAT_GET(src, i, j), MAT_GET(filter, i, j));
 			MAT_SET(dest, w, i, j);
 		}
 	}
 	uint j = CUR_INFO.scratch[1];
+	inc_addr_add(1);
 	scratch_bak[0] = (j + tile_size_x == cols) ? CUR_INFO.scratch[0] + tile_size_y : CUR_INFO.scratch[0];
 	scratch_bak[1] = (j + tile_size_x == cols) ? 0 : CUR_INFO.scratch[1] + tile_size_x;
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
@@ -203,16 +226,32 @@ void task_dm_mul() {
 
 	for(uint i = 0; i < tile_size_y; i++) {
 		uint idx_i = CUR_INFO.scratch[0] + i;
+		inc_addr_add(1);
 		for(uint k = 0; k < tile_size_y; k++) {
 			uint idx_k = CUR_INFO.scratch[2] + k;
 			fixed w = 0;
 			for(uint j = 0; j < tile_size_x; j++) {
+				inc_addr_add(3);
+				inc_addr_mul(2);
+				inc_mul(1);
+				inc_add(1);
+				inc_ld(3);
 				uint idx_j = CUR_INFO.scratch[1] + j;
 				fixed tmp = F_MUL(MAT_GET(filter, idx_i, idx_j), MAT_GET(src, idx_j, idx_k));
 				w = F_ADD(w, tmp);
 			}
+			inc_addr_add(1);
+			inc_addr_mul(1);
+			inc_st(2);
+			if(CUR_INFO.scratch[1] >= tile_size_x) {
+				inc_add(1);
+				inc_addr_mul(1);
+				inc_addr_add(1);
+			}
 			w = (CUR_INFO.scratch[1] >= tile_size_x) ? F_ADD(w, MAT_GET(dest, idx_i, idx_k)) : w;
 			MAT_SET(inter1, w, i, k);
+			inc_addr_mul(2);
+			inc_addr_add(3);
 			uint where = idx_i * dcols + idx_k;
 			write_to_gbuf((uint8_t *)(inter1->data + i * tile_size_x + k), 
 				(uint8_t *)(dest->data + where), sizeof(fixed));
@@ -225,6 +264,7 @@ void task_dm_mul() {
 	// i
 	scratch_bak[0] = CUR_INFO.scratch[0];
 	if(CUR_INFO.scratch[1] + tile_size_x == cols) {
+		inc_addr_add(1);
 		scratch_bak[0] = CUR_INFO.scratch[0] + tile_size_y;
 	}
 	// j
@@ -232,9 +272,11 @@ void task_dm_mul() {
 	if(CUR_INFO.scratch[1] + tile_size_x == cols && CUR_INFO.scratch[2] + tile_size_y == dcols) {
 		scratch_bak[1] = 0;
 	} else if(CUR_INFO.scratch[2] + tile_size_y == dcols) {
+		inc_addr_add(1);
 		scratch_bak[1] = CUR_INFO.scratch[1] + tile_size_x;
 	}
 	// k
+	inc_addr_add(1);
 	scratch_bak[2] = CUR_INFO.scratch[2] + tile_size_y;
 	if(CUR_INFO.scratch[2] + tile_size_y == dcols) {
 		scratch_bak[2] = 0;
@@ -430,8 +472,17 @@ void task_sm_mul() {
 	}
 
 	for(uint j = CUR_INFO.scratch[4]; j < CUR_INFO.scratch[4] + tile_size_x; j++) {
+		inc_addr_add(3);
+		inc_addr_mul(2);
+		inc_mul(1);
+		inc_ld(2);
+		inc_st(1);
 		fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, j));
 		if(zero == 2) {
+			inc_addr_add(1);
+			inc_addr_mul(1);
+			inc_ld(1);
+			inc_add(1);	
 			w = F_ADD(w, MAT_GET(inter, i, j));
 		}
 		MAT_SET(dest, w, i, j);
@@ -440,12 +491,15 @@ void task_sm_mul() {
 
 	uint j = CUR_INFO.scratch[4];
 	scratch_bak[4] = (j + tile_size_x == dcols) ? 0 : j + tile_size_x;
+	inc_addr_add(1);
 	if(j + tile_size_x == dcols) {
 		scratch_bak[0] = pos + 1;
 		scratch_bak[2] = k + filter->sparse.offsets[pos + 1];
 		scratch_bak[3] = (scratch_bak[2] / cols > 0) ? 1 : 2;
 		scratch_bak[1] = i + scratch_bak[2] / cols;
 		scratch_bak[2] %= cols;
+		inc_addr_add(3);
+		inc_addr_mul(1);
 		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
 		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint));
@@ -464,8 +518,8 @@ void task_sm_conv() {
 	mat_t *inter = inter1;
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
-	uint rows = MAT_GET_DIM(dest, 0);
-	uint cols = MAT_GET_DIM(dest, 1);
+	uint rows = stride[1] * MAT_GET_DIM(dest, 0);
+	uint cols = stride[2] * MAT_GET_DIM(dest, 1);
 	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
 	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
 
@@ -488,7 +542,7 @@ void task_sm_conv() {
 	uint i = CUR_INFO.scratch[2];
 	uint j = CUR_INFO.scratch[3];
 	mat_t *tmp = dest;
-	// Problem here
+
 	if(total_elements % 2 == 0 && pos % 2 == 0) { // A
 		dest = inter;
 		inter = tmp;
@@ -500,23 +554,74 @@ void task_sm_conv() {
 	uint k = idx / (fcols * frows); // Layers
 	uint l = (idx % (fcols * frows)) / fcols; // Rows
 	uint n = idx % fcols; // Cols
-	for(uint ti = 0; ti < tile_size_y; ti++) {
-		for(uint tj = 0; tj < tile_size_x; tj++) {
+	inc_addr_mul(2);
+	if(stride[1] + stride[2] > 2) {
+		for(uint ti = 0; ti < tile_size_y; ti++) {
 			uint idx_i = i + ti;
-			uint idx_j = j + tj;
-			fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, idx_i + l, idx_j + n));
-			if(zero == 2) {
-				w = F_ADD(w, MAT_GET(inter, idx_i, idx_j));
+			inc_addr_add(1);
+			if(idx_i % stride[1] != 0) continue;
+			uint strided_i = idx_i / stride[1];
+			for(uint tj = 0; tj < tile_size_x; tj++) {
+				uint idx_j = j + tj;
+				inc_addr_add(1);
+				if(idx_j % stride[2] != 0) continue;
+				uint strided_j = idx_j / stride[1];
+				inc_addr_add(5);
+				inc_addr_mul(3);
+				inc_mul(1);
+				inc_ld(2);
+				inc_st(1);	
+				fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, idx_i + l, idx_j + n));
+				if(zero == 2) {
+					inc_addr_mul(1);
+					inc_addr_add(1);
+					inc_ld(1);
+					inc_add(1);
+					w = F_ADD(w, MAT_GET(inter, strided_i, strided_j));
+				}
+				MAT_SET(dest, w, strided_i, strided_j);
+				inc_addr_add(2);
+				inc_addr_mul(2);
+				inc_st(1);
+				write_to_gbuf((uint8_t *)(dest->data + strided_i * cols + strided_j), 
+					(uint8_t *)(inter->data + strided_i * cols + strided_j), sizeof(uint));
 			}
-			MAT_SET(dest, w, idx_i, idx_j);
-			write_to_gbuf((uint8_t *)(dest->data + idx_i * cols + idx_j), (uint8_t *)(inter->data + idx_i * cols + idx_j), sizeof(uint));
+		}
+	} else {
+		for(uint ti = 0; ti < tile_size_y; ti++) {
+			inc_addr_add(1);
+			for(uint tj = 0; tj < tile_size_x; tj++) {
+				uint idx_i = i + ti;
+				inc_addr_add(1);
+				uint idx_j = j + tj;
+				inc_addr_add(5);
+				inc_addr_mul(3);
+				inc_mul(1);
+				inc_ld(2);
+				inc_st(1);	
+				fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, idx_i + l, idx_j + n));
+				if(zero == 2) {
+					inc_addr_mul(1);
+					inc_addr_add(1);
+					inc_add(1);
+					inc_ld(1);
+					w = F_ADD(w, MAT_GET(inter, idx_i, idx_j));
+				}
+				MAT_SET(dest, w, idx_i, idx_j);
+				inc_addr_add(2);
+				inc_addr_mul(2);
+				inc_st(1);
+				write_to_gbuf((uint8_t *)(dest->data + idx_i * cols + idx_j), (uint8_t *)(inter->data + idx_i * cols + idx_j), sizeof(uint));
+			}
 		}
 	}
 
 	scratch_bak[2] = (j + tile_size_x == cols) ? i + tile_size_y : i;
 	scratch_bak[3] = (j + tile_size_x == cols) ? 0 : j + tile_size_x;
+	inc_addr_add(1);
 
 	if(j + tile_size_x == cols && i + tile_size_y == rows) {
+		inc_addr_add(2);
 		scratch_bak[0] = idx + filter->sparse.offsets[pos + 1];
 		scratch_bak[1] = pos + 1;
 		scratch_bak[2] = 0;
@@ -575,26 +680,43 @@ void task_sm_conv_same() {
 	uint k = idx / (fcols * frows); // Layers
 	uint l = (idx % (fcols * frows)) / fcols; // Rows
 	uint n = idx % fcols; // Cols
+	inc_addr_mul(2);
 	for(uint ti = 0; ti < tile_size_y; ti++) {
+		inc_addr_add(1);
 		for(uint tj = 0; tj < tile_size_x; tj++) {
 			uint idx_i = i + ti;
+			inc_addr_add(1);
 			uint idx_j = j + tj;
+			inc_addr_add(5);
+			inc_addr_mul(3);
+			inc_mul(1);
+			inc_ld(2);
+			inc_st(1);	
 			fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, idx_i + l, idx_j + n));
 			if(idx_i + l >= MAT_GET_DIM(src, 1) || idx_j + n >= MAT_GET_DIM(src, 2)) {
 				w = 0;
 			}
 			if(zero == 2) {
+				inc_addr_mul(1);
+				inc_addr_add(1);
+				inc_add(1);
+				inc_ld(1);
 				w = F_ADD(w, MAT_GET(inter, idx_i, idx_j));
 			}
 			MAT_SET(dest, w, idx_i, idx_j);
+			inc_addr_add(2);
+			inc_addr_mul(2);
+			inc_st(1);
 			write_to_gbuf((uint8_t *)(dest->data + idx_i * cols + idx_j), (uint8_t *)(inter->data + idx_i * cols + idx_j), sizeof(uint));
 		}
 	}
 
 	scratch_bak[2] = (j + tile_size_x == cols) ? i + tile_size_y : i;
 	scratch_bak[3] = (j + tile_size_x == cols) ? 0 : j + tile_size_x;
+	inc_addr_add(1);
 
 	if(j + tile_size_x == cols && i + tile_size_y == rows) {
+		inc_addr_add(2);
 		scratch_bak[0] = idx + filter->sparse.offsets[pos + 1];
 		scratch_bak[1] = pos + 1;
 		scratch_bak[2] = 0;

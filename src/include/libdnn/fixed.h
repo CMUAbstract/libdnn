@@ -2,6 +2,7 @@
 #define FIXED_H
 
 #include "types.h"
+#include "profile.h"
 
 #define F_N 5
 #define F_ONE (1 << F_N)
@@ -9,7 +10,9 @@
 #define F_MASK (~(F_ONE | (F_ONE - 1)))
 
 #define F_LIT(f) (fixed)(f * F_ONE)
-#define F_TO_FLOAT(f) (float)(f) / F_ONE 
+#define F_INT_LIT(i) (fixed)(i << F_N)
+#define F_TO_FLOAT(f) (float)(f) / F_ONE
+#define F_TO_INT(i) (int)(i >> F_N) 
 #define F_ADD(a, b) a + b
 #define F_SUB(a, b) a - b
 #define F_MUL(a, b) f_mul(a, b)
@@ -33,6 +36,7 @@
 static inline fixed f_mul(fixed a, fixed b) {
     signed int tmp = a * b;
     tmp += F_K;
+    inc_add(1);
     tmp >>= F_N;
     return (fixed)tmp;
 };
