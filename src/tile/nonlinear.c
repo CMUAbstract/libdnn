@@ -112,27 +112,20 @@ void task_filter() {
 void task_relu() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	uint rows = MAT_GET_DIM(src, 0);
-	uint cols = MAT_GET_DIM(src, 1);
-	uint tile_size_x = greatest_tile_size(cols, CONFIG_TILE_SIZE);
-	uint tile_size_y = greatest_tile_size(rows, CONFIG_TILE_SIZE);
-	fixed max = F_LIT(0.0);
-	for(uint i = 0; i < tile_size_y; i++) {
-		uint idx_i = CUR_INFO.scratch[0] + i;
-		for(uint j = 0; j < tile_size_x; j++) {
-			uint idx_j = CUR_INFO.scratch[1] + j;
-			max = MAT_GET(src, idx_i, idx_j);
-			MAT_SET(dest, max, idx_i, idx_j);
-			if(F_LT(max, F_LIT(0.0)))
-				MAT_SET(dest, F_LIT(0.0), idx_i, idx_j);
-		}
+	uint total_elements = MAT_GET_DIM(src, 0) * MAT_GET_DIM(src, 1);
+	if(src->len_dims == 3) {
+		total_elements *= MAT_GET_DIM(src, 2);
 	}
-	scratch_bak[0] = (CUR_INFO.scratch[1] + tile_size_x == cols) ? CUR_INFO.scratch[0] + tile_size_y : 0;
-	scratch_bak[1] = (CUR_INFO.scratch[1] + tile_size_x == cols) ? 0 : CUR_INFO.scratch[1] + tile_size_x;
+	fixed max = F_LIT(0.0);
+	uint tile_size = greatest_tile_size(total_elements, CONFIG_TILE_SIZE);
+	for(uint i = 0; i < tile_size; i++) {
+		uint idx_i = CUR_INFO.scratch[0] + i;
+		max = *(src->data + idx_i);
+		*(dest->data + idx_i) = (F_LT(max, F_LIT(0.0))) ? F_LIT(0.0) : max;
+	}
+	scratch_bak[0] = CUR_INFO.scratch[0] + tile_size;
 	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
-	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
-	if(!(CUR_INFO.scratch[0] + tile_size_y == rows &&
-		 CUR_INFO.scratch[1] + tile_size_x == cols)) {
+	if(!(CUR_INFO.scratch[0] + tile_size == total_elements)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 2);

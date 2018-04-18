@@ -79,16 +79,14 @@ void task_filter() {
 void task_relu() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	uint rows = MAT_GET_DIM(src, 0);
-	uint cols = MAT_GET_DIM(src, 1);
+	uint total_elements = MAT_GET_DIM(src, 0) * MAT_GET_DIM(src, 1);
+	if(src->len_dims == 3) {
+		total_elements *= MAT_GET_DIM(src, 2);
+	}
 	fixed max = F_LIT(0.0);
-	for(uint i = 0; i < rows; i++) {
-		for(uint j = 0; j < cols; j++) {
-			max = MAT_GET(src, i, j);
-			MAT_SET(dest, max, i, j);
-			if(F_LT(max, F_LIT(0.0)))
-				MAT_SET(dest, F_LIT(0.0), i, j);
-		}
+	for(uint i = 0; i < total_elements; i++) {
+		max = *(src->data + i);
+		*(dest->data + i) = (F_LT(max, F_LIT(0.0))) ? F_LIT(0.0) : max;
 	}
 	POP_STACK(mat_stack, 2);
 	last_task = CUR_TASK;
