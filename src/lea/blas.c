@@ -21,14 +21,14 @@ static __fram mat_t *inter2 = &m2;
 
 static DSPLIB_DATA(tsrc1, 2) fixed tsrc1[CONFIG_TILE_SIZE];
 static DSPLIB_DATA(tsrc2, 2) fixed tsrc2[CONFIG_TILE_SIZE];
-static DSPLIB_DATA(tsrc3, 2) fixed tsrc3[MAT_BUFFER_SIZE];
-static DSPLIB_DATA(tsrc4, 2) fixed tsrc4[MAT_BUFFER_SIZE];
+static DSPLIB_DATA(tsrc3, 2) fixed tsrc3[CONFIG_MAT_BUF_SIZE];
+static DSPLIB_DATA(tsrc4, 2) fixed tsrc4[CONFIG_MAT_BUF_SIZE];
 static DSPLIB_DATA(tdest, 2) fixed tdest[2];
 
 // static __fram fixed tsrc1[CONFIG_TILE_SIZE];
 // static __fram fixed tsrc2[CONFIG_TILE_SIZE];
-// static __fram fixed tsrc3[MAT_BUFFER_SIZE];
-// static __fram fixed tsrc4[MAT_BUFFER_SIZE];
+// static __fram fixed tsrc3[CONFIG_MAT_BUF_SIZE];
+// static __fram fixed tsrc4[CONFIG_MAT_BUF_SIZE];
 // static __fram fixed tdest[2];
 
 
@@ -391,7 +391,7 @@ void task_dm_mul() {
 }
 
 // Dense matrix convolution
-__fram fixed coalesced_filter[MAT_BUFFER_SIZE];
+__fram fixed coalesced_filter[CONFIG_MAT_BUF_SIZE];
 void task_dm_conv() {
 	check_calibrate();
 	mat_t *src = PEEK_STACK(mat_stack, 0);
@@ -1695,7 +1695,7 @@ void __attribute__((interrupt(DMA_VECTOR)))dmaIsrHandler(void) {
    __bic_SR_register_on_exit(LPM0_bits);
 }
 
-#if 1
+#ifndef MSP_DISABLE_LEA
 void __attribute__ ((interrupt(LEA_VECTOR))) msp_lea_isr(void) {
     /* Save the interrupt flags, clear interrupt and exit LPM0. */
     uint16_t flags = LEAIFG;
