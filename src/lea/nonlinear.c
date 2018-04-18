@@ -83,7 +83,7 @@ void task_relu() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	uint total_elements = MAT_GET_DIM(src, 0) * MAT_GET_DIM(src, 1);
 	if(src->len_dims == 3) {
-		uint total_elements *= MAT_GET_DIM(src, 2);
+		total_elements *= MAT_GET_DIM(src, 2);
 	}
 	fixed max = F_LIT(0.0);
 	for(uint i = CUR_INFO.scratch[0]; i < total_elements; i = ++CUR_INFO.scratch[0]) {
