@@ -5,8 +5,8 @@
 
 #define TASK_UID_NONLINEAR_OFFSET 60
 
-extern uint stride[3];
-extern uint size[3];
+extern uint16_t stride[3];
+extern uint16_t size[3];
 
 void task_pool();
 void task_relu();

@@ -15,7 +15,7 @@
 
 static __fram mat_t m = {.data = LAYER_BUFFER(0)};
 static __fram mat_t *inter = &m;
-static __fram uint scratch_bak[SCRATCH_SIZE];
+static __fram uint16_t scratch_bak[SCRATCH_SIZE];
 
 // Public tasks
 TASK(TASK_UID_LINALG_OFFSET, task_norm);
@@ -42,7 +42,7 @@ void task_norm() {
 		MAT_RESHAPE(dest, MAT_GET_DIM(dest, 1), MAT_GET_DIM(dest, 0));
 		PUSH_STACK(mat_stack, dest, src);
 		scratch_bak[0] = 1;	
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
 		TASK_REF(task_transpose)->info.return_task = CUR_TASK;
 		TRANSITION_TO(task_transpose);
 	} else if(CUR_INFO.scratch[0] == 1) {
@@ -50,14 +50,14 @@ void task_norm() {
 		// Assumes filter, dest, src in that order
 		PUSH_STACK(mat_stack, dest, inter, src);
 		scratch_bak[0] = 2;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
 		TASK_REF(task_dm_mul)->info.return_task = CUR_TASK;
 		TRANSITION_TO(task_dm_mul);
 	} else if(CUR_INFO.scratch[0] == 2) {
 		PRINTF("\r\n    Taking sqrt");
 		scratch_bak[0] = 3;
 		scratch_bak[1] = F_SQRT(MAT_GET(inter, 0, 0)); 
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
 		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(inter->data), sizeof(fixed));
 		transition_to(CUR_TASK);
 	} else if(CUR_INFO.scratch[0] == 3) {
@@ -66,7 +66,7 @@ void task_norm() {
 		MAT_RESHAPE(dest, MAT_GET_DIM(dest, 1), MAT_GET_DIM(dest, 0));
 		PUSH_STACK(mat_stack, inter, dest, src);
 		scratch_bak[0] = 4;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
 		TASK_REF(task_ds_div)->info.return_task = CUR_TASK;
 		TRANSITION_TO(task_ds_div);
 	}

@@ -1,12 +1,12 @@
 #ifndef STATE_H
 #define STATE_H
-#include <libfixed/fixed.h>
+#include <libmat/mat.h>
 
 #define SAVE_DEPTH 0x10
 
 typedef struct {
 	mat_t *data[SAVE_DEPTH];
-	uint pos;
+	uint16_t pos;
 } stack_t;
 
 extern stack_t *mat_stack;
@@ -19,7 +19,7 @@ extern stack_t *mat_stack;
 
 #define PEEK_STACK(st, p) st->data[(st->pos - p - 1) % SAVE_DEPTH]
 
-void push_stack(stack_t *, mat_t *[], uint);
-void pop_stack(stack_t *, uint);
+void push_stack(stack_t *, mat_t *[], uint16_t);
+void pop_stack(stack_t *, uint16_t);
 
 #endif

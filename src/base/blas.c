@@ -41,10 +41,10 @@ void task_ds_add() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
-	uint rows = MAT_GET_DIM(src, 0);
-	uint cols = MAT_GET_DIM(src, 1);
-	for(uint i = 0; i < rows; i++) {
-		for(uint j = 0; j < cols; j++) {
+	uint16_t rows = MAT_GET_DIM(src, 0);
+	uint16_t cols = MAT_GET_DIM(src, 1);
+	for(uint16_t i = 0; i < rows; i++) {
+		for(uint16_t j = 0; j < cols; j++) {
 			inc_addr_add(2);
 			inc_addr_mul(2);
 			inc_add(1);
@@ -64,10 +64,10 @@ void task_ds_mul() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
-	uint rows = MAT_GET_DIM(src, 0);
-	uint cols = MAT_GET_DIM(src, 1);
-	for(uint i = 0; i < rows; i++) {
-		for(uint j = 0; j < cols; j++) {
+	uint16_t rows = MAT_GET_DIM(src, 0);
+	uint16_t cols = MAT_GET_DIM(src, 1);
+	for(uint16_t i = 0; i < rows; i++) {
+		for(uint16_t j = 0; j < cols; j++) {
 			inc_addr_add(2);
 			inc_addr_mul(2);
 			inc_mul(1);
@@ -87,10 +87,10 @@ void task_ds_div() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
-	uint rows = MAT_GET_DIM(src, 0);
-	uint cols = MAT_GET_DIM(src, 1);
-	for(uint i = 0; i < rows; i++) {
-		for(uint j = 0; j < cols; j++) {
+	uint16_t rows = MAT_GET_DIM(src, 0);
+	uint16_t cols = MAT_GET_DIM(src, 1);
+	for(uint16_t i = 0; i < rows; i++) {
+		for(uint16_t j = 0; j < cols; j++) {
 			fixed w = F_DIV(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}
@@ -104,10 +104,10 @@ void task_ds_div() {
 void task_ds_zero() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	uint rows = MAT_GET_DIM(src, 0);
-	uint cols = MAT_GET_DIM(src, 1);
-	for(uint i = 0; i < rows; i++) {
-		for(uint j = 0; j < cols; j++) {
+	uint16_t rows = MAT_GET_DIM(src, 0);
+	uint16_t cols = MAT_GET_DIM(src, 1);
+	for(uint16_t i = 0; i < rows; i++) {
+		for(uint16_t j = 0; j < cols; j++) {
 			inc_addr_add(1);
 			inc_addr_mul(1);
 			inc_st(1);
@@ -124,10 +124,10 @@ void task_dm_add() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
-	uint rows = MAT_GET_DIM(src, 0);
-	uint cols = MAT_GET_DIM(src, 1);
-	for(uint i = 0; i < rows; i++) {
-		for(uint j = 0; j < cols; j++) {
+	uint16_t rows = MAT_GET_DIM(src, 0);
+	uint16_t cols = MAT_GET_DIM(src, 1);
+	for(uint16_t i = 0; i < rows; i++) {
+		for(uint16_t j = 0; j < cols; j++) {
 			inc_addr_add(2);
 			inc_addr_mul(2);
 			inc_add(1);
@@ -147,13 +147,13 @@ void task_dm_mul() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
-	uint rows = MAT_GET_DIM(filter, 0);
-	uint cols = MAT_GET_DIM(filter, 1);
-	uint dcols = MAT_GET_DIM(dest, 1);
-	for(uint i = 0; i < rows; i++) {
-		for(uint k = 0; k < dcols; k++) {
+	uint16_t rows = MAT_GET_DIM(filter, 0);
+	uint16_t cols = MAT_GET_DIM(filter, 1);
+	uint16_t dcols = MAT_GET_DIM(dest, 1);
+	for(uint16_t i = 0; i < rows; i++) {
+		for(uint16_t k = 0; k < dcols; k++) {
 			fixed w = 0;
-			for(uint j = 0; j < cols; j++) {
+			for(uint16_t j = 0; j < cols; j++) {
 				inc_addr_add(2);
 				inc_addr_mul(2);
 				inc_mul(1);
@@ -179,17 +179,17 @@ void task_dm_conv() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
-	uint rows = MAT_GET_DIM(dest, 0);
-	uint cols = MAT_GET_DIM(dest, 1);
+	uint16_t rows = MAT_GET_DIM(dest, 0);
+	uint16_t cols = MAT_GET_DIM(dest, 1);
 
-	uint flayers = MAT_GET_DIM(filter, 0);
-	uint frows = MAT_GET_DIM(filter, 1);
-	uint fcols = MAT_GET_DIM(filter, 2);
-	for(uint k = 0; k < flayers; k++) {
-		for(uint l = 0; l < frows; l++) {
-			for(uint n = 0; n < fcols; n++) {
-				for(uint i = 0; i < rows; i++) {
-					for(uint j = 0; j < cols; j++) {
+	uint16_t flayers = MAT_GET_DIM(filter, 0);
+	uint16_t frows = MAT_GET_DIM(filter, 1);
+	uint16_t fcols = MAT_GET_DIM(filter, 2);
+	for(uint16_t k = 0; k < flayers; k++) {
+		for(uint16_t l = 0; l < frows; l++) {
+			for(uint16_t n = 0; n < fcols; n++) {
+				for(uint16_t i = 0; i < rows; i++) {
+					for(uint16_t j = 0; j < cols; j++) {
 						fixed w = F_MUL(MAT_GET(filter, k, l, n), MAT_GET(src, k, i + l, j + n));
 						if(k == 0 && l == 0 && n == 0) { // Zero
 							MAT_SET(dest, w, i, j);
@@ -214,17 +214,17 @@ void task_dm_conv_same() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
-	uint rows = MAT_GET_DIM(dest, 0);
-	uint cols = MAT_GET_DIM(dest, 1);
+	uint16_t rows = MAT_GET_DIM(dest, 0);
+	uint16_t cols = MAT_GET_DIM(dest, 1);
 
-	uint flayers = MAT_GET_DIM(filter, 0);
-	uint frows = MAT_GET_DIM(filter, 1);
-	uint fcols = MAT_GET_DIM(filter, 2);
-	for(uint k = 0; k < flayers; k++) {
-		for(uint l = 0; l < frows; l++) {
-			for(uint n = 0; n < fcols; n++) {
-				for(uint i = 0; i < rows; i++) {
-					for(uint j = 0; j < cols; j++) {
+	uint16_t flayers = MAT_GET_DIM(filter, 0);
+	uint16_t frows = MAT_GET_DIM(filter, 1);
+	uint16_t fcols = MAT_GET_DIM(filter, 2);
+	for(uint16_t k = 0; k < flayers; k++) {
+		for(uint16_t l = 0; l < frows; l++) {
+			for(uint16_t n = 0; n < fcols; n++) {
+				for(uint16_t i = 0; i < rows; i++) {
+					for(uint16_t j = 0; j < cols; j++) {
 						fixed w = F_MUL(MAT_GET(filter, k, l, n), MAT_GET(src, k, i + l, j + n));
 						if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {
 							w = 0;
@@ -252,13 +252,13 @@ void task_sm_mul() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
-	uint cols = MAT_GET_DIM(src, 0); // p => j
-	uint dcols = MAT_GET_DIM(dest, 1); // p => j
-	uint total_elements = MAT_GET_DIM(filter, 0);
+	uint16_t cols = MAT_GET_DIM(src, 0); // p => j
+	uint16_t dcols = MAT_GET_DIM(dest, 1); // p => j
+	uint16_t total_elements = MAT_GET_DIM(filter, 0);
 
-	uint pos = 0;
-	uint i = 0;
-	uint k = 0;
+	uint16_t pos = 0;
+	uint16_t i = 0;
+	uint16_t k = 0;
 	char zero = 1;
 
 	while(pos < total_elements) {
@@ -269,7 +269,7 @@ void task_sm_mul() {
 		i += k / cols;
 		k %= cols;
 		// PRINTF("\r\n i: %u k: %u pos: %u val: %i", i, k, pos, MAT_GET(filter, pos));
-		for(uint j = 0; j < dcols; j++) {
+		for(uint16_t j = 0; j < dcols; j++) {
 			inc_addr_add(3);
 			inc_addr_mul(2);
 			inc_mul(1);
@@ -300,28 +300,28 @@ void task_sm_conv() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
-	uint rows = MAT_GET_DIM(dest, 0);
-	uint cols = MAT_GET_DIM(dest, 1);
-	uint frows = filter->sparse.dims[1];
-	uint fcols = filter->sparse.dims[2];
-	uint total_elements = MAT_GET_DIM(filter, 0);
+	uint16_t rows = MAT_GET_DIM(dest, 0);
+	uint16_t cols = MAT_GET_DIM(dest, 1);
+	uint16_t frows = filter->sparse.dims[1];
+	uint16_t fcols = filter->sparse.dims[2];
+	uint16_t total_elements = MAT_GET_DIM(filter, 0);
 
-	uint idx = 0;
-	uint pos = 0;
+	uint16_t idx = 0;
+	uint16_t pos = 0;
 	char zero = 1;
 	while(pos < total_elements) {
 		inc_addr_add(1);
 		idx += filter->sparse.offsets[pos];
-		uint k = idx / (fcols * frows); // Layers
-		uint l = (idx % (fcols * frows)) / fcols; // Rows
+		uint16_t k = idx / (fcols * frows); // Layers
+		uint16_t l = (idx % (fcols * frows)) / fcols; // Rows
 		inc_addr_mul(2);
-		uint n = idx % fcols; // Cols
+		uint16_t n = idx % fcols; // Cols
 		// PRINTF("\r\n k: %u l: %u n: %u idx: %u pos: %u val: %i", k, l, n, idx, pos, MAT_GET(filter, pos));
 		if(stride[1] + stride[2] > 2) {
-			uint i_stride = 0;
-			for(uint i = 0; i < rows * stride[1]; i += stride[1]) {
-				uint j_stride = 0;
-				for(uint j = 0; j < cols * stride[2]; j += stride[2]) {
+			uint16_t i_stride = 0;
+			for(uint16_t i = 0; i < rows * stride[1]; i += stride[1]) {
+				uint16_t j_stride = 0;
+				for(uint16_t j = 0; j < cols * stride[2]; j += stride[2]) {
 					inc_addr_add(5);
 					inc_addr_mul(3);
 					inc_mul(1);
@@ -340,8 +340,8 @@ void task_sm_conv() {
 				i_stride++;
 			}
 		} else {
-			for(uint i = 0; i < rows; i++) {
-				for(uint j = 0; j < cols; j++) {
+			for(uint16_t i = 0; i < rows; i++) {
+				for(uint16_t j = 0; j < cols; j++) {
 					inc_addr_add(5);
 					inc_addr_mul(3);
 					inc_mul(1);
@@ -372,27 +372,27 @@ void task_sm_conv_same() {
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
-	uint rows = MAT_GET_DIM(dest, 0);
-	uint cols = MAT_GET_DIM(dest, 1);
-	uint frows = filter->sparse.dims[1];
-	uint fcols = filter->sparse.dims[2];
-	uint total_elements = MAT_GET_DIM(filter, 0);
+	uint16_t rows = MAT_GET_DIM(dest, 0);
+	uint16_t cols = MAT_GET_DIM(dest, 1);
+	uint16_t frows = filter->sparse.dims[1];
+	uint16_t fcols = filter->sparse.dims[2];
+	uint16_t total_elements = MAT_GET_DIM(filter, 0);
 
-	uint idx = 0;
-	uint pos = 0;
+	uint16_t idx = 0;
+	uint16_t pos = 0;
 	char zero = 1;
 	while(pos < total_elements) {
 		idx += filter->sparse.offsets[pos];
-		uint k = idx / (fcols * frows); // Layers
-		uint l = (idx % (fcols * frows)) / fcols; // Rows
-		uint n = idx % fcols; // Cols
+		uint16_t k = idx / (fcols * frows); // Layers
+		uint16_t l = (idx % (fcols * frows)) / fcols; // Rows
+		uint16_t n = idx % fcols; // Cols
 		inc_addr_mul(2);
 		// PRINTF("\r\n k: %u l: %u n: %u idx: %u pos: %u val: %i", k, l, n, idx, pos, MAT_GET(filter, pos));
 		if(stride[1] + stride[2] > 2) {
-			uint i_stride = 0;
-			for(uint i = 0; i < rows * stride[1]; i += stride[1]) {
-				uint j_stride = 0;
-				for(uint j = 0; j < cols * stride[2]; j += stride[2]) {
+			uint16_t i_stride = 0;
+			for(uint16_t i = 0; i < rows * stride[1]; i += stride[1]) {
+				uint16_t j_stride = 0;
+				for(uint16_t j = 0; j < cols * stride[2]; j += stride[2]) {
 					fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
 					if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {
 						w = 0;
@@ -415,8 +415,8 @@ void task_sm_conv_same() {
 				i_stride++;
 			}
 		} else {
-			for(uint i = 0; i < rows; i++) {
-				for(uint j = 0; j < cols; j++) {
+			for(uint16_t i = 0; i < rows; i++) {
+				for(uint16_t j = 0; j < cols; j++) {
 					fixed w = F_MUL(MAT_GET(filter, pos), MAT_GET(src, k, i + l, j + n));
 					if(i + l >= MAT_GET_DIM(src, 1) || j + n >= MAT_GET_DIM(src, 2)) {
 						w = 0;

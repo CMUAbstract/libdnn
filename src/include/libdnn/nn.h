@@ -1,5 +1,6 @@
 #ifndef NN_H
 #define NN_H
+#include <stdbool.h>
 #include <libalpaca/alpaca.h>
 #include <libfixed/fixed.h>
 

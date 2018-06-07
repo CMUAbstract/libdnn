@@ -14,7 +14,7 @@
 #define TASK_UID_BLAS_OFFSET 10
 #define SHIFT 5
 
-extern uint stride[3];
+extern uint16_t stride[3];
 
 void task_ds_zero();
 void task_ds_add();

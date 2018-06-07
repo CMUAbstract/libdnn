@@ -32,16 +32,16 @@ void task_cleanup_nonlinear() {
 void task_pool() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	uint layers = MAT_GET_DIM(src, 0);
-	uint rows = MAT_GET_DIM(src, 1);
-	uint cols = MAT_GET_DIM(src, 2);
+	uint16_t layers = MAT_GET_DIM(src, 0);
+	uint16_t rows = MAT_GET_DIM(src, 1);
+	uint16_t cols = MAT_GET_DIM(src, 2);
 
-	for(uint i = 0; i < layers; i++) {
-		for(uint j = 0; j < rows; j += stride[1]) {
-			for(uint k = 0; k < cols; k += stride[2]) {
+	for(uint16_t i = 0; i < layers; i++) {
+		for(uint16_t j = 0; j < rows; j += stride[1]) {
+			for(uint16_t k = 0; k < cols; k += stride[2]) {
 				fixed max = MAT_GET(src, i, j, k);
-				for(uint l = 0; l < size[1]; l ++) {
-					for(uint m = 0; m < size[2]; m ++) {
+				for(uint16_t l = 0; l < size[1]; l ++) {
+					for(uint16_t m = 0; m < size[2]; m ++) {
 						fixed val = MAT_GET(src, i, j + l, k + m);
 						if(F_LT(max, val))
 							max = val;
@@ -59,12 +59,12 @@ void task_pool() {
 void task_filter() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	uint layers = MAT_GET_DIM(src, 0);
-	uint rows = MAT_GET_DIM(src, 1);
-	uint cols = MAT_GET_DIM(src, 2);
-	for(uint i = 0; i < layers; i += stride[0]) {
-		for(uint j = 0; j < rows; j += stride[1]) {
-			for(uint k = 0; k < cols; k += stride[2]) {
+	uint16_t layers = MAT_GET_DIM(src, 0);
+	uint16_t rows = MAT_GET_DIM(src, 1);
+	uint16_t cols = MAT_GET_DIM(src, 2);
+	for(uint16_t i = 0; i < layers; i += stride[0]) {
+		for(uint16_t j = 0; j < rows; j += stride[1]) {
+			for(uint16_t k = 0; k < cols; k += stride[2]) {
 				fixed w = MAT_GET(src, i, j, k);
 				MAT_SET(dest, w, i / stride[0], j / stride[1], k / stride[2]);
 			}
@@ -78,12 +78,12 @@ void task_filter() {
 void task_relu() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	uint total_elements = MAT_GET_DIM(src, 0) * MAT_GET_DIM(src, 1);
+	uint16_t total_elements = MAT_GET_DIM(src, 0) * MAT_GET_DIM(src, 1);
 	if(src->len_dims == 3) {
 		total_elements *= MAT_GET_DIM(src, 2);
 	}
 	fixed max = F_LIT(0.0);
-	for(uint i = 0; i < total_elements; i++) {
+	for(uint16_t i = 0; i < total_elements; i++) {
 		max = *(src->data + i);
 		*(dest->data + i) = (F_LT(max, F_LIT(0.0))) ? F_LIT(0.0) : max;
 	}
@@ -95,10 +95,10 @@ void task_relu() {
 void task_transpose() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	uint rows = MAT_GET_DIM(src, 0);
-	uint cols = MAT_GET_DIM(src, 1);
-	for(uint i = 0; i < rows; i++) {
-		for(uint j = 0; j < cols; j++) {
+	uint16_t rows = MAT_GET_DIM(src, 0);
+	uint16_t cols = MAT_GET_DIM(src, 1);
+	for(uint16_t i = 0; i < rows; i++) {
+		for(uint16_t j = 0; j < cols; j++) {
 			MAT_SET(dest, MAT_GET(src, i, j), j, i);
 		}
 	}
