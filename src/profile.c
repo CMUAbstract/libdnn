@@ -1,6 +1,6 @@
 #include <libio/console.h>
+#include <libfixed/fixed.h>
 #include "profile.h"
-#include "fixed.h"
 #include "mem.h"
 
 #ifdef CONFIG_PROFILE

@@ -8,7 +8,6 @@
 #include "blas.h"
 #include "mem.h"
 #include "state.h"
-#include "fixed.h"
 #include "misc.h"
 
 // Public tasks

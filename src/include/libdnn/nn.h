@@ -8,12 +8,16 @@
 extern bool same_padding;
 
 void task_d_conv();
+void task_d_depthconv();
 void task_s_conv();
+void task_s_depthconv();
 void task_d_fc();
 void task_s_fc();
 
 extern TASK_DEC(task_d_conv);
+extern TASK_DEC(task_d_depthconv);
 extern TASK_DEC(task_s_conv);
+extern TASK_DEC(task_s_depthconv);
 extern TASK_DEC(task_d_fc);
 extern TASK_DEC(task_s_fc);
 
