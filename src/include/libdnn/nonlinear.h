@@ -1,7 +1,7 @@
 #ifndef NONLINEAR_H
 #define NONLINEAR_H
 #include <libalpaca/alpaca.h>
-#include "types.h"
+#include <libfixed/fixed.h>
 
 #define TASK_UID_NONLINEAR_OFFSET 60
 

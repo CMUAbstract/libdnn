@@ -2,15 +2,14 @@
 #include <msp430.h>
 #include <libio/console.h>
 #include <libalpaca/alpaca.h>
+#include <libfixed/fixed.h>
+#include <libmat/mat.h>
 
 #include "nn.h"
 #include "blas.h"
 #include "mem.h"
-#include "types.h"
 #include "state.h"
 #include "buffer.h"
-#include "fixed.h"
-#include "mat.h"
 #include "misc.h"
 
 static __fram mat_t m = {.data = LAYER_BUFFER(0)};
@@ -69,6 +68,11 @@ void task_d_conv() {
 		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
 		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 		transition_to(CUR_TASK);
+	}
+	if(b == NULL) {
+		last_task = CUR_TASK;
+		POP_STACK(mat_stack, 4);
+		TRANSITION_TO(task_cleanup_nn);
 	}
 	uint i = CUR_INFO.scratch[1];
 	PRINTF("\r\n    Biasing %u", i);
@@ -172,6 +176,11 @@ void task_s_conv() {
 		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 		transition_to(CUR_TASK);
 	}
+	if(b == NULL) {
+		last_task = CUR_TASK;
+		POP_STACK(mat_stack, 4);
+		TRANSITION_TO(task_cleanup_nn);
+	}
 	uint i = CUR_INFO.scratch[1];
 	PRINTF("\r\n    Biasing %u", i);
 	if(i < filters) {
@@ -237,6 +246,11 @@ void task_s_conv() {
 		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint));
 		transition_to(CUR_TASK);
 	}
+	if(b == NULL) {
+		last_task = CUR_TASK;
+		POP_STACK(mat_stack, 4);
+		TRANSITION_TO(task_cleanup_nn);
+	}
 	uint i = CUR_INFO.scratch[1];
 	PRINTF("\r\n    Biasing %u", i);
 	if(i < filters) {
@@ -270,15 +284,19 @@ void task_d_fc() {
 		scratch_bak[0] = 1;
 		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
 		TRANSITION_TO(task_dm_mul);
-	} else if(CUR_INFO.scratch[0] == 1) { // Bias
-		PRINTF("\r\n     Biasing");
-		TASK_REF(task_dm_add)->info.return_task = CUR_TASK;
-		// Assumes filter, dest, src in that order
-		PUSH_STACK(mat_stack, b, dest, inter);
-		scratch_bak[0] = 2;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
-		TRANSITION_TO(task_dm_add);
+	} // Bias
+	if(b == NULL) {
+		last_task = CUR_TASK;
+		POP_STACK(mat_stack, 4);
+		TRANSITION_TO(task_cleanup_nn);
 	}
+	PRINTF("\r\n     Biasing");
+	TASK_REF(task_dm_add)->info.return_task = CUR_TASK;
+	// Assumes filter, dest, src in that order
+	PUSH_STACK(mat_stack, b, dest, inter);
+	scratch_bak[0] = 2;
+	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+	TRANSITION_TO(task_dm_add);
 	POP_STACK(mat_stack, 6);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_nn);
@@ -298,15 +316,19 @@ void task_s_fc() {
 		scratch_bak[0] = 1;
 		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
 		TRANSITION_TO(task_sm_mul);
-	} else if(CUR_INFO.scratch[0] == 1) { // Bias
-		PRINTF("\r\n     Biasing");
-		TASK_REF(task_dm_add)->info.return_task = CUR_TASK;
-		// Assumes filter, dest, src in that order
-		PUSH_STACK(mat_stack, b, dest, inter);
-		scratch_bak[0] = 2;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
-		TRANSITION_TO(task_dm_add);
+	} // Bias
+	if(b == NULL) {
+		last_task = CUR_TASK;
+		POP_STACK(mat_stack, 4);
+		TRANSITION_TO(task_cleanup_nn);
 	}
+	PRINTF("\r\n     Biasing");
+	TASK_REF(task_dm_add)->info.return_task = CUR_TASK;
+	// Assumes filter, dest, src in that order
+	PUSH_STACK(mat_stack, b, dest, inter);
+	scratch_bak[0] = 2;
+	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint));
+	TRANSITION_TO(task_dm_add);
 	POP_STACK(mat_stack, 4);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_nn);

@@ -67,6 +67,23 @@ void mat_set(mat_t *m, fixed val, uint len, uint idxs[]) {
 	*(m->data + _offset_calc(m, len, idxs)) = val;
 }
 
+void mat_transpose(mat_t *m) {
+	uint16_t start = 0;
+	uint16_t end = m->len_dims - 1;
+	while(start < end) {
+		uint16_t tmp = m->dims[start];
+		m->dims[start] = m->dims[end];
+		m->dims[end] = tmp;
+
+		tmp = m->strides[start];
+		m->strides[start] = m->strides[end];
+		m->strides[end] = tmp;
+
+		start++;
+		end--;
+	}
+}
+
 void mat_dump(mat_t *m, uint which) {
 	uint rows = MAT_GET_DIM(m, m->len_dims - 2);
 	uint cols = MAT_GET_DIM(m, m->len_dims - 1);

@@ -1,7 +1,7 @@
 #ifndef BLAS_H
 #define BLAS_H
 #include <libalpaca/alpaca.h>
-#include "types.h"
+#include <libfixed/fixed.h>
 
 #if DMA == 0 // Disable DMA
 	#define DMA_ENABLE && 0

@@ -1,7 +1,7 @@
 #ifndef PROFILE_H
 #define PROFILE_H
 
-#include "types.h"
+#include <libfixed/fixed.h>
 
 #ifndef CONFIG_PROFILE
 #pragma GCC warning "no profiling"

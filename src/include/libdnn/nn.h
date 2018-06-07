@@ -1,7 +1,7 @@
 #ifndef NN_H
 #define NN_H
 #include <libalpaca/alpaca.h>
-#include "types.h"
+#include <libfixed/fixed.h>
 
 #define TASK_UID_NN_OFFSET 20
 

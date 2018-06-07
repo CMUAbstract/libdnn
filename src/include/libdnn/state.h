@@ -1,6 +1,6 @@
 #ifndef STATE_H
 #define STATE_H
-#include "types.h"
+#include <libfixed/fixed.h>
 
 #define SAVE_DEPTH 0x10
 

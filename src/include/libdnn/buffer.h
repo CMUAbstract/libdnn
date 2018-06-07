@@ -1,7 +1,7 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 #include <libalpaca/alpaca.h>
-#include "types.h"
+#include <libfixed/fixed.h>
 
 #define MAT_BUF_NUMBER 3
 #define LAYER_BUF_NUMBER 3

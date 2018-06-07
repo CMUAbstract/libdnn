@@ -1,16 +1,16 @@
 #include <string.h>
+#include <msp430.h>
 #include <libio/console.h>
 #include <libmspdriver/driverlib.h>
 #include <libdsp/DSPLib.h>
 #include <libalpaca/alpaca.h>
+#include <libfixed/fixed.h>
+#include <libmat/mat.h>
 
 #include "blas.h"
 #include "mem.h"
-#include "types.h"
 #include "state.h"
 #include "buffer.h"
-#include "fixed.h"
-#include "mat.h"
 #include "misc.h"
 #include "profile.h"
 
@@ -19,17 +19,19 @@ static __fram mat_t m2 = {.data = MAT_BUFFER(1)};
 static __fram mat_t *inter1 = &m1;
 static __fram mat_t *inter2 = &m2;
 
+#ifndef MSP_DISABLE_LEA
 static DSPLIB_DATA(tsrc1, 2) fixed tsrc1[CONFIG_TILE_SIZE];
 static DSPLIB_DATA(tsrc2, 2) fixed tsrc2[CONFIG_TILE_SIZE];
 static DSPLIB_DATA(tsrc3, 2) fixed tsrc3[CONFIG_MAT_BUF_SIZE];
 static DSPLIB_DATA(tsrc4, 2) fixed tsrc4[CONFIG_MAT_BUF_SIZE];
 static DSPLIB_DATA(tdest, 2) fixed tdest[2];
-
-// static __fram fixed tsrc1[CONFIG_TILE_SIZE];
-// static __fram fixed tsrc2[CONFIG_TILE_SIZE];
-// static __fram fixed tsrc3[CONFIG_MAT_BUF_SIZE];
-// static __fram fixed tsrc4[CONFIG_MAT_BUF_SIZE];
-// static __fram fixed tdest[2];
+#else
+static __fram fixed tsrc1[CONFIG_TILE_SIZE];
+static __fram fixed tsrc2[CONFIG_TILE_SIZE];
+static __fram fixed tsrc3[CONFIG_MAT_BUF_SIZE];
+static __fram fixed tsrc4[CONFIG_MAT_BUF_SIZE];
+static __fram fixed tdest[2];
+#endif
 
 
 
@@ -122,6 +124,8 @@ TASK(50, task_debug2);
 void task_debug2() {
 	P1OUT = 0x00;
 #ifdef CONFIG_INTERMITTENT
+	P1OUT = 0x01;
+	P1DIR = 0x01;
 	while(1){}
 #else
 	PRINTF("\r\n debugging...");
@@ -134,6 +138,8 @@ void task_calibrate() {
 		CUR_INFO.scratch[1] = CONFIG_TILE_SIZE;
 		CUR_INFO.scratch[0] = 1;
 #ifdef CONFIG_INTERMITTENT
+		P1OUT = 0x01;
+		P1DIR = 0x01;
 		while(1) {}
 #else
 		transition_to(CUR_TASK);
@@ -142,6 +148,8 @@ void task_calibrate() {
 	if(CUR_INFO.scratch[0] == 3) {
 		CUR_INFO.scratch[0] = 1;
 #ifdef CONFIG_INTERMITTENT
+		P1OUT = 0x01;
+		P1DIR = 0x01;
 		while(1) {}
 #else
 		transition_to(CUR_TASK);

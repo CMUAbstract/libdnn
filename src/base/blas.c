@@ -1,14 +1,13 @@
 #include <string.h>
 #include <libio/console.h>
 #include <libalpaca/alpaca.h>
+#include <libfixed/fixed.h>
+#include <libmat/mat.h>
 
 #include "blas.h"
 #include "mem.h"
-#include "types.h"
 #include "state.h"
 #include "buffer.h"
-#include "fixed.h"
-#include "mat.h"
 #include "misc.h"
 #include "profile.h"
 
