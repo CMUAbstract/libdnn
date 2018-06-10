@@ -60,7 +60,7 @@ void task_d_conv() {
 		if(i < filters) {
 			target->info.return_task = CUR_TASK;
 			// Assumes filter, dest, src in that order
-			c_inter = MAT_CONSTRAIN(inter, i);
+			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			c_filter = MAT_CONSTRAIN(w, i);
 			PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
@@ -114,9 +114,10 @@ void task_d_depthconv() {
 		if(i < filters) {
 			target->info.return_task = CUR_TASK;
 			// Assumes filter, dest, src in that order
-			c_inter = MAT_CONSTRAIN(inter, i);
+			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			c_filter = MAT_CONSTRAIN(w, i);
 			c_src = MAT_CONSTRAIN(src, i);
+			MAT_RESHAPE(c_src_ptr, 1, MAT_GET_DIM(src, 1), MAT_GET_DIM(src, 2));
 			PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, c_src_ptr);
 			scratch_bak[1] = i + 1;
 			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
@@ -168,7 +169,7 @@ void task_s_conv() {
 	}
 	if(CUR_INFO.scratch[0] == 0) { // Sparse Convolve
 		PRINTF("\r\n Shifting src");
-		mat_reshape(inter, src->len_dims, src->dims);
+		mat_reshape(inter, src->dims, src->len_dims);
 		for(uint16_t k = CUR_INFO.scratch[2]; k < MAT_GET_DIM(src, 0); k = ++CUR_INFO.scratch[2]) {
 			for(uint16_t i = CUR_INFO.scratch[3]; i < MAT_GET_DIM(src, 1); i = ++CUR_INFO.scratch[3]) {
 				for(uint16_t j = CUR_INFO.scratch[4]; j < MAT_GET_DIM(src, 2); j = ++CUR_INFO.scratch[4]) {
@@ -185,7 +186,7 @@ void task_s_conv() {
 		transition_to(CUR_TASK);	
 	} else if(CUR_INFO.scratch[0] == 1) { // Sparse Convolve
 		PRINTF("\r\n Writing back");
-		mat_reshape(inter, src->len_dims, src->dims);
+		mat_reshape(inter, src->dims, src->len_dims);
 		for(uint16_t k = CUR_INFO.scratch[2]; k < MAT_GET_DIM(src, 0); k = ++CUR_INFO.scratch[2]) {
 			for(uint16_t i = CUR_INFO.scratch[3]; i < MAT_GET_DIM(src, 1); i = ++CUR_INFO.scratch[3]) {
 				for(uint16_t j = CUR_INFO.scratch[4]; j < MAT_GET_DIM(src, 2); j = ++CUR_INFO.scratch[4]) {
@@ -211,7 +212,7 @@ void task_s_conv() {
 				c_filter = MAT_CONSTRAIN(w, running_size);
 				c_filter.dims[0] = w->sparse.sizes[i];
 				c_filter.sparse.len_dims = w->sparse.len_dims - 1;
-				c_inter = MAT_CONSTRAIN(inter, i);
+				c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, src);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
@@ -222,7 +223,7 @@ void task_s_conv() {
 			PRINTF("\r\n     Zeroing %u", i);
 			TASK_REF(task_ds_zero)->info.return_task = CUR_TASK;
 			// Assumes dest, src in that order
-			c_inter = MAT_CONSTRAIN(inter, i);
+			(b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
 			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
@@ -289,7 +290,7 @@ void task_s_depthconv() {
 		transition_to(CUR_TASK);	
 	} else if(CUR_INFO.scratch[0] == 1) { // Sparse Convolve
 		PRINTF("\r\n Writing back");
-		mat_reshape(inter, src->len_dims, src->dims);
+		mat_reshape(inter, src->dims, src->len_dims);
 		for(uint16_t k = CUR_INFO.scratch[2]; k < MAT_GET_DIM(src, 0); k = ++CUR_INFO.scratch[2]) {
 			for(uint16_t i = CUR_INFO.scratch[3]; i < MAT_GET_DIM(src, 1); i = ++CUR_INFO.scratch[3]) {
 				for(uint16_t j = CUR_INFO.scratch[4]; j < MAT_GET_DIM(src, 2); j = ++CUR_INFO.scratch[4]) {
@@ -315,8 +316,9 @@ void task_s_depthconv() {
 				c_filter = MAT_CONSTRAIN(w, running_size);
 				c_filter.dims[0] = w->sparse.sizes[i];
 				c_filter.sparse.len_dims = w->sparse.len_dims - 1;
-				c_inter = MAT_CONSTRAIN(inter, i);
+				c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 				c_src = MAT_CONSTRAIN(src, i);
+				MAT_RESHAPE(c_src_ptr, 1, MAT_GET_DIM(src, 1), MAT_GET_DIM(src, 2));
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, c_src_ptr);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
@@ -327,7 +329,7 @@ void task_s_depthconv() {
 			PRINTF("\r\n     Zeroing %u", i);
 			TASK_REF(task_ds_zero)->info.return_task = CUR_TASK;
 			// Assumes dest, src in that order
-			c_inter = MAT_CONSTRAIN(inter, i);
+			(b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
 			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
@@ -386,7 +388,7 @@ void task_s_conv() {
 				c_filter = MAT_CONSTRAIN(w, running_size);
 				c_filter.dims[0] = w->sparse.sizes[i];
 				c_filter.sparse.len_dims = w->sparse.len_dims - 1;
-				c_inter = MAT_CONSTRAIN(inter, i);
+				c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, src);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
@@ -397,7 +399,7 @@ void task_s_conv() {
 			PRINTF("\r\n     Zeroing %u", i);
 			TASK_REF(task_ds_zero)->info.return_task = CUR_TASK;
 			// Assumes dest, src in that order
-			c_inter = MAT_CONSTRAIN(inter, i);
+			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
 			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
@@ -456,8 +458,9 @@ void task_s_depthconv() {
 				c_filter = MAT_CONSTRAIN(w, running_size);
 				c_filter.dims[0] = w->sparse.sizes[i];
 				c_filter.sparse.len_dims = w->sparse.len_dims - 1;
-				c_inter = MAT_CONSTRAIN(inter, i);
-				c_src = MAT_CONSTRAIN(src, i);
+				c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
+				c_src = MAT_CONSTRAIN(src, i); // PROBLEM HERE because expect 3D Tensor
+				MAT_RESHAPE(c_src_ptr, 1, MAT_GET_DIM(src, 1), MAT_GET_DIM(src, 2));
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, c_src_ptr);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
@@ -468,7 +471,7 @@ void task_s_depthconv() {
 			PRINTF("\r\n     Zeroing %u", i);
 			TASK_REF(task_ds_zero)->info.return_task = CUR_TASK;
 			// Assumes dest, src in that order
-			c_inter = MAT_CONSTRAIN(inter, i);
+			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
 			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
@@ -519,20 +522,21 @@ void task_d_fc() {
 		scratch_bak[0] = 1;
 		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
 		TRANSITION_TO(task_dm_mul);
-	} // Bias
-	if(b == NULL) {
-		last_task = CUR_TASK;
-		POP_STACK(mat_stack, 4);
-		TRANSITION_TO(task_cleanup_nn);
+	} else if(CUR_INFO.scratch[0] == 1) { // Bias
+		if(b == NULL) {
+			last_task = CUR_TASK;
+			POP_STACK(mat_stack, 4);
+			TRANSITION_TO(task_cleanup_nn);
+		}
+		PRINTF("\r\n     Biasing");
+		TASK_REF(task_dm_add)->info.return_task = CUR_TASK;
+		// Assumes filter, dest, src in that order
+		PUSH_STACK(mat_stack, b, dest, inter);
+		scratch_bak[0] = 2;
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		TRANSITION_TO(task_dm_add);
 	}
-	PRINTF("\r\n     Biasing");
-	TASK_REF(task_dm_add)->info.return_task = CUR_TASK;
-	// Assumes filter, dest, src in that order
-	PUSH_STACK(mat_stack, b, dest, inter);
-	scratch_bak[0] = 2;
-	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
-	TRANSITION_TO(task_dm_add);
-	POP_STACK(mat_stack, 6);
+	POP_STACK(mat_stack, 4);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_nn);
 }
@@ -551,19 +555,20 @@ void task_s_fc() {
 		scratch_bak[0] = 1;
 		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
 		TRANSITION_TO(task_sm_mul);
-	} // Bias
-	if(b == NULL) {
-		last_task = CUR_TASK;
-		POP_STACK(mat_stack, 4);
-		TRANSITION_TO(task_cleanup_nn);
+	} else if(CUR_INFO.scratch[0] == 1) { // Bias
+		if(b == NULL) {
+			last_task = CUR_TASK;
+			POP_STACK(mat_stack, 4);
+			TRANSITION_TO(task_cleanup_nn);
+		}
+		PRINTF("\r\n     Biasing");
+		TASK_REF(task_dm_add)->info.return_task = CUR_TASK;
+		// Assumes filter, dest, src in that order
+		PUSH_STACK(mat_stack, b, dest, inter);
+		scratch_bak[0] = 2;
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		TRANSITION_TO(task_dm_add);
 	}
-	PRINTF("\r\n     Biasing");
-	TASK_REF(task_dm_add)->info.return_task = CUR_TASK;
-	// Assumes filter, dest, src in that order
-	PUSH_STACK(mat_stack, b, dest, inter);
-	scratch_bak[0] = 2;
-	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
-	TRANSITION_TO(task_dm_add);
 	POP_STACK(mat_stack, 4);
 	last_task = CUR_TASK;
 	TRANSITION_TO(task_cleanup_nn);

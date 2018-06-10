@@ -516,6 +516,8 @@ void task_sm_conv() {
 	uint16_t k = idx / (fcols * frows); // Layers
 	uint16_t l = (idx % (fcols * frows)) / fcols; // Rows
 	uint16_t n = idx % fcols; // Cols
+	// PRINTF("\r\nrows: %u cols: %u frows: %u fcols: %u total_elements: %u idx: %u pos: %u k: %u l: %u n: %u val: %i", 
+		// rows, cols, frows, fcols, total_elements, idx, pos, k, l, n, MAT_GET(filter, pos));
 	inc_addr_mul(2);
 	if(stride[1] + stride[2] > 2) {
 		for(uint16_t i = CUR_INFO.scratch[2]; i < rows * stride[1]; i = (CUR_INFO.scratch[2] += stride[1])) {
