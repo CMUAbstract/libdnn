@@ -223,7 +223,7 @@ void task_s_conv() {
 			PRINTF("\r\n     Zeroing %u", i);
 			TASK_REF(task_ds_zero)->info.return_task = CUR_TASK;
 			// Assumes dest, src in that order
-			(b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
+			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
 			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
@@ -273,7 +273,7 @@ void task_s_depthconv() {
 	}
 	if(CUR_INFO.scratch[0] == 0) { // Sparse Convolve
 		PRINTF("\r\n Shifting src");
-		mat_reshape(inter, src->len_dims, src->dims);
+		mat_reshape(inter, src->dims, src->len_dims);
 		for(uint16_t k = CUR_INFO.scratch[2]; k < MAT_GET_DIM(src, 0); k = ++CUR_INFO.scratch[2]) {
 			for(uint16_t i = CUR_INFO.scratch[3]; i < MAT_GET_DIM(src, 1); i = ++CUR_INFO.scratch[3]) {
 				for(uint16_t j = CUR_INFO.scratch[4]; j < MAT_GET_DIM(src, 2); j = ++CUR_INFO.scratch[4]) {
@@ -329,7 +329,7 @@ void task_s_depthconv() {
 			PRINTF("\r\n     Zeroing %u", i);
 			TASK_REF(task_ds_zero)->info.return_task = CUR_TASK;
 			// Assumes dest, src in that order
-			(b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
+			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
 			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
