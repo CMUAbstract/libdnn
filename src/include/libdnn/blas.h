@@ -3,11 +3,14 @@
 #include <libalpaca/alpaca.h>
 #include <libfixed/fixed.h>
 
-#if DMA == 0 // Disable DMA
+#if CONFIG_DMA == 0 // Disable DMA
+#pragma GCC "Disable DMA"
 	#define DMA_ENABLE && 0
-#elif DMA == 1 // Always use DMA
+#elif CONFIG_DMA == 1 // Always use DMA
+#pragma GCC "Always DMA"
 	#define DMA_ENABLE || 1
 #else // Choose DMA
+#pragma GCC "Choose DMA"
 	#define DMA_ENABLE && 1
 #endif
 
@@ -24,8 +27,8 @@ void task_dm_add();
 void task_dm_mul();
 void task_dm_conv();
 void task_dm_conv_same();
-void task_dm_conv1d();
 void task_sm_mul();
+void task_svm_mul();
 void task_sm_conv();
 void task_sm_conv_same();
 
@@ -38,6 +41,7 @@ extern TASK_DEC(task_dm_mul);
 extern TASK_DEC(task_dm_conv);
 extern TASK_DEC(task_dm_conv_same);
 extern TASK_DEC(task_sm_mul);
+extern TASK_DEC(task_svm_mul);
 extern TASK_DEC(task_sm_conv);
 extern TASK_DEC(task_sm_conv_same);
 

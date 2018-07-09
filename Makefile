@@ -1,8 +1,12 @@
 LIB = libdnn
 
-OBJECTS = nn.o state.o linalg.o buffer.o profile.o \
+OBJECTS = nn.o state.o linalg.o buffer.o profile.o cleanup.o \
 		$(LIBDNN_BACKEND)/nonlinear.o \
-		$(LIBDNN_BACKEND)/blas.o 
+		$(LIBDNN_BACKEND)/task_ds_zero.o $(LIBDNN_BACKEND)/task_ds_add.o \
+		$(LIBDNN_BACKEND)/task_ds_mul.o $(LIBDNN_BACKEND)/task_ds_div.o \
+		$(LIBDNN_BACKEND)/task_dm_add.o $(LIBDNN_BACKEND)/task_dm_mul.o \
+		$(LIBDNN_BACKEND)/task_dm_conv.o $(LIBDNN_BACKEND)/task_sm_mul.o \
+		$(LIBDNN_BACKEND)/task_svm_mul.o $(LIBDNN_BACKEND)/task_sm_conv.o
 
 $(info $(OBJECTS))
 $(info $(CFLAGS))
