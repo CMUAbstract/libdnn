@@ -30,7 +30,7 @@ void task_norm() {
 		MAT_RESHAPE(dest, MAT_GET_DIM(dest, 1), MAT_GET_DIM(dest, 0));
 		PUSH_STACK(mat_stack, dest, src);
 		scratch_bak[0] = 1;	
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 		TASK_REF(task_transpose)->info.return_task = CUR_TASK;
 		TRANSITION_TO(task_transpose);
 	} else if(CUR_SCRATCH[0] == 1) {
@@ -38,14 +38,14 @@ void task_norm() {
 		// Assumes filter, dest, src in that order
 		PUSH_STACK(mat_stack, dest, inter, src);
 		scratch_bak[0] = 2;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 		TASK_REF(task_dm_mul)->info.return_task = CUR_TASK;
 		TRANSITION_TO(task_dm_mul);
 	} else if(CUR_SCRATCH[0] == 2) {
 		PRINTF("\r\n    Taking sqrt");
 		scratch_bak[0] = 3;
 		scratch_bak[1] = F_SQRT(MAT_GET(inter, 0, 0)); 
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(inter->data), sizeof(fixed));
 		transition_to(CUR_TASK);
 	} else if(CUR_SCRATCH[0] == 3) {
@@ -54,7 +54,7 @@ void task_norm() {
 		MAT_RESHAPE(dest, MAT_GET_DIM(dest, 1), MAT_GET_DIM(dest, 0));
 		PUSH_STACK(mat_stack, inter, dest, src);
 		scratch_bak[0] = 4;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 		TASK_REF(task_ds_div)->info.return_task = CUR_TASK;
 		TRANSITION_TO(task_ds_div);
 	}

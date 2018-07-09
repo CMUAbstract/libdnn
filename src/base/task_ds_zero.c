@@ -27,7 +27,7 @@ void task_ds_zero() {
 			MAT_SET(dest, 0, i, j);
 		}
 	}
-	POP_STACK(mat_stack, 3);
+	POP_STACK(mat_stack, 2);
 	setup_cleanup(CUR_TASK);
 	TRANSITION_TO(task_cleanup);
 }

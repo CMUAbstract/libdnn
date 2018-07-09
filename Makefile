@@ -8,9 +8,6 @@ OBJECTS = nn.o state.o linalg.o buffer.o profile.o cleanup.o \
 		$(LIBDNN_BACKEND)/task_dm_conv.o $(LIBDNN_BACKEND)/task_sm_mul.o \
 		$(LIBDNN_BACKEND)/task_svm_mul.o $(LIBDNN_BACKEND)/task_sm_conv.o
 
-$(info $(OBJECTS))
-$(info $(CFLAGS))
-
 DEPS = libio libalpaca libfixed libmat
 
 override SRC_ROOT = ../../src

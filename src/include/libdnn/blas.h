@@ -4,13 +4,13 @@
 #include <libfixed/fixed.h>
 
 #if CONFIG_DMA == 0 // Disable DMA
-#pragma GCC "Disable DMA"
+#pragma message "Disable DMA"
 	#define DMA_ENABLE && 0
 #elif CONFIG_DMA == 1 // Always use DMA
-#pragma GCC "Always DMA"
+#pragma message "Always DMA"
 	#define DMA_ENABLE || 1
 #else // Choose DMA
-#pragma GCC "Choose DMA"
+#pragma message "Choose DMA"
 	#define DMA_ENABLE && 1
 #endif
 

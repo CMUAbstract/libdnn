@@ -52,13 +52,13 @@ void task_d_conv() {
 			c_filter = MAT_CONSTRAIN(w, i);
 			PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
-			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 			transition_to(target);
 		}
 		scratch_bak[0] = 1;	
 		scratch_bak[1] = 0;	
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		transition_to(CUR_TASK);
 	}
 	if(b == NULL) {
@@ -76,7 +76,7 @@ void task_d_conv() {
 		c_dest = MAT_CONSTRAIN(dest, i);
 		PUSH_STACK(mat_stack, c_filter_ptr, c_dest_ptr, c_inter_ptr);
 		scratch_bak[1] = i + 1;
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		TRANSITION_TO(task_ds_add);
 	}
 	POP_STACK(mat_stack, 4);
@@ -108,13 +108,13 @@ void task_d_depthconv() {
 			MAT_RESHAPE(c_src_ptr, 1, MAT_GET_DIM(src, 1), MAT_GET_DIM(src, 2));
 			PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, c_src_ptr);
 			scratch_bak[1] = i + 1;
-			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 			transition_to(target);
 		}
 		scratch_bak[0] = 1;	
 		scratch_bak[1] = 0;	
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		transition_to(CUR_TASK);
 	}
 	if(b == NULL) {
@@ -132,7 +132,7 @@ void task_d_depthconv() {
 		c_dest = MAT_CONSTRAIN(dest, i);
 		PUSH_STACK(mat_stack, c_filter_ptr, c_dest_ptr, c_inter_ptr);
 		scratch_bak[1] = i + 1;
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		TRANSITION_TO(task_ds_add);
 	}
 	POP_STACK(mat_stack, 4);
@@ -142,7 +142,7 @@ void task_d_depthconv() {
 
 #ifdef CONFIG_LEA
 // #if 0
-#pragma GCC warning "Using LEA Backend"
+#pragma message "Using LEA Backend"
 void task_s_conv() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
@@ -169,8 +169,8 @@ void task_s_conv() {
 		}
 		scratch_bak[0] = 1;
 		scratch_bak[2] = 0;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));	
-		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint16_t));	
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));	
+		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));	
 		transition_to(CUR_TASK);	
 	} else if(CUR_SCRATCH[0] == 1) { // Sparse Convolve
 		PRINTF("\r\n Writing back");
@@ -186,8 +186,8 @@ void task_s_conv() {
 		}
 		scratch_bak[0] = 2;
 		scratch_bak[2] = 0;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));	
-		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint16_t));	
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));	
+		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));	
 		transition_to(CUR_TASK);	
 	} else if(CUR_SCRATCH[0] == 2) {
 		uint16_t i = CUR_SCRATCH[1];
@@ -204,8 +204,8 @@ void task_s_conv() {
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, src);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
-				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
-				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint16_t));
+				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
+				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 				transition_to(target);
 			}
 			PRINTF("\r\n     Zeroing %u", i);
@@ -214,14 +214,14 @@ void task_s_conv() {
 			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
-			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 			TRANSITION_TO(task_ds_zero);
 		}
 		// All done
 		scratch_bak[0] = 3;	
 		scratch_bak[1] = 0;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		transition_to(CUR_TASK);
 	}
 	if(b == NULL) {
@@ -239,7 +239,7 @@ void task_s_conv() {
 		c_dest = MAT_CONSTRAIN(dest, i);
 		PUSH_STACK(mat_stack, c_filter_ptr, c_dest_ptr, c_inter_ptr);
 		scratch_bak[1] = i + 1;
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		TRANSITION_TO(task_ds_add);
 	}
 	POP_STACK(mat_stack, 4);
@@ -273,8 +273,8 @@ void task_s_depthconv() {
 		}
 		scratch_bak[0] = 1;
 		scratch_bak[2] = 0;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));	
-		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint16_t));	
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));	
+		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));	
 		transition_to(CUR_TASK);	
 	} else if(CUR_SCRATCH[0] == 1) { // Sparse Convolve
 		PRINTF("\r\n Writing back");
@@ -290,8 +290,8 @@ void task_s_depthconv() {
 		}
 		scratch_bak[0] = 2;
 		scratch_bak[2] = 0;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));	
-		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint16_t));	
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));	
+		write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));	
 		transition_to(CUR_TASK);	
 	} else if(CUR_SCRATCH[0] == 2) {
 		uint16_t i = CUR_SCRATCH[1];
@@ -310,8 +310,8 @@ void task_s_depthconv() {
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, c_src_ptr);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
-				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
-				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint16_t));
+				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
+				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 				transition_to(target);
 			}
 			PRINTF("\r\n     Zeroing %u", i);
@@ -320,14 +320,14 @@ void task_s_depthconv() {
 			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
-			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 			TRANSITION_TO(task_ds_zero);
 		}
 		// All done
 		scratch_bak[0] = 3;	
 		scratch_bak[1] = 0;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		transition_to(CUR_TASK);
 	}
 	if(b == NULL) {
@@ -345,7 +345,7 @@ void task_s_depthconv() {
 		c_dest = MAT_CONSTRAIN(dest, i);
 		PUSH_STACK(mat_stack, c_filter_ptr, c_dest_ptr, c_inter_ptr);
 		scratch_bak[1] = i + 1;
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		TRANSITION_TO(task_ds_add);
 	}
 	POP_STACK(mat_stack, 4);
@@ -380,8 +380,8 @@ void task_s_conv() {
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, src);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
-				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
-				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint16_t));
+				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
+				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 				transition_to(target);
 			}
 			PRINTF("\r\n     Zeroing %u", i);
@@ -390,14 +390,14 @@ void task_s_conv() {
 			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
-			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 			TRANSITION_TO(task_ds_zero);
 		}
 		// All done
 		scratch_bak[0] = 1;	
 		scratch_bak[1] = 0;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		transition_to(CUR_TASK);
 	}
 	if(b == NULL) {
@@ -415,7 +415,7 @@ void task_s_conv() {
 		c_dest = MAT_CONSTRAIN(dest, i);
 		PUSH_STACK(mat_stack, c_filter_ptr, c_dest_ptr, c_inter_ptr);
 		scratch_bak[1] = i + 1;
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		TRANSITION_TO(task_ds_add);
 	}
 	POP_STACK(mat_stack, 4);
@@ -452,8 +452,8 @@ void task_s_depthconv() {
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, c_src_ptr);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
-				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
-				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_INFO.scratch + 2), sizeof(uint16_t));
+				write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
+				write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 				transition_to(target);
 			}
 			PRINTF("\r\n     Zeroing %u", i);
@@ -462,14 +462,14 @@ void task_s_depthconv() {
 			c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
 			PUSH_STACK(mat_stack, c_inter_ptr, src);
 			scratch_bak[1] = i + 1;
-			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+			write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 			TRANSITION_TO(task_ds_zero);
 		}
 		// All done
 		scratch_bak[0] = 1;	
 		scratch_bak[1] = 0;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		transition_to(CUR_TASK);
 	}
 	if(b == NULL) {
@@ -487,7 +487,7 @@ void task_s_depthconv() {
 		c_dest = MAT_CONSTRAIN(dest, i);
 		PUSH_STACK(mat_stack, c_filter_ptr, c_dest_ptr, c_inter_ptr);
 		scratch_bak[1] = i + 1;
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_INFO.scratch + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		TRANSITION_TO(task_ds_add);
 	}
 	POP_STACK(mat_stack, 4);
@@ -508,7 +508,7 @@ void task_d_fc() {
 		// Assumes filter, dest, src in that order
 		PUSH_STACK(mat_stack, w, inter, src);
 		scratch_bak[0] = 1;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 		TRANSITION_TO(task_dm_mul);
 	} else if(CUR_SCRATCH[0] == 1) { // Bias
 		if(b == NULL) {
@@ -521,7 +521,7 @@ void task_d_fc() {
 		// Assumes filter, dest, src in that order
 		PUSH_STACK(mat_stack, b, dest, inter);
 		scratch_bak[0] = 2;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 		TRANSITION_TO(task_dm_add);
 	}
 	POP_STACK(mat_stack, 4);
@@ -541,7 +541,7 @@ void task_s_fc() {
 		// Assumes filter, dest, src in that order
 		PUSH_STACK(mat_stack, w, inter, src);
 		scratch_bak[0] = 1;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 		TRANSITION_TO(task_svm_mul);
 	} else if(CUR_SCRATCH[0] == 1) { // Bias
 		if(b == NULL) {
@@ -554,7 +554,7 @@ void task_s_fc() {
 		// Assumes filter, dest, src in that order
 		PUSH_STACK(mat_stack, b, dest, inter);
 		scratch_bak[0] = 2;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_INFO.scratch), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 		TRANSITION_TO(task_dm_add);
 	}
 	POP_STACK(mat_stack, 4);

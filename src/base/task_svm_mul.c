@@ -20,9 +20,7 @@ void task_svm_mul() {
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
 	uint16_t rows = MAT_GET_DIM(dest, 0); // n => i
-	uint16_t cols = MAT_GET_DIM(src, 0); // m => j
 
-	uint16_t j = CUR_SCRATCH[1]; // data/col index
 	for(uint16_t i = 0; i < rows; i++) {
 		uint16_t start = filter->sparse.sizes[i];
 		uint16_t end = filter->sparse.sizes[i + 1];

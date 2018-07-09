@@ -4,7 +4,7 @@
 #include <libfixed/fixed.h>
 
 #ifndef CONFIG_PROFILE
-#pragma GCC warning "no profiling"
+#pragma message "no profiling"
 	#define inc_ld(v) (void)0
 	#define inc_ld_vec(v) (void)0
 	#define inc_st(v) (void)0
