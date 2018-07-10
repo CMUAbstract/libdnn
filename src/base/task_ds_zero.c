@@ -21,9 +21,6 @@ void task_ds_zero() {
 	uint16_t cols = MAT_GET_DIM(src, 1);
 	for(uint16_t i = 0; i < rows; i++) {
 		for(uint16_t j = 0; j < cols; j++) {
-			inc_addr_add(1);
-			inc_addr_mul(1);
-			inc_st(1);
 			MAT_SET(dest, 0, i, j);
 		}
 	}

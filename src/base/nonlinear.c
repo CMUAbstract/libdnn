@@ -26,17 +26,17 @@ void task_pool() {
 	uint16_t cols = MAT_GET_DIM(src, 2);
 
 	for(uint16_t i = 0; i < layers; i++) {
-		for(uint16_t j = 0; j < rows; j += stride[1]) {
-			for(uint16_t k = 0; k < cols; k += stride[2]) {
+		for(uint16_t j = 0; j < rows; j += params.stride[1]) {
+			for(uint16_t k = 0; k < cols; k += params.stride[2]) {
 				fixed max = MAT_GET(src, i, j, k);
-				for(uint16_t l = 0; l < size[1]; l ++) {
-					for(uint16_t m = 0; m < size[2]; m ++) {
+				for(uint16_t l = 0; l < params.size[1]; l ++) {
+					for(uint16_t m = 0; m < params.size[2]; m ++) {
 						fixed val = MAT_GET(src, i, j + l, k + m);
 						if(F_LT(max, val))
 							max = val;
 					}
 				}
-				MAT_SET(dest, max, i, j / stride[1], k / stride[2]);
+				MAT_SET(dest, max, i, j / params.stride[1], k / params.stride[2]);
 			}
 		}
 	}
@@ -51,11 +51,12 @@ void task_filter() {
 	uint16_t layers = MAT_GET_DIM(src, 0);
 	uint16_t rows = MAT_GET_DIM(src, 1);
 	uint16_t cols = MAT_GET_DIM(src, 2);
-	for(uint16_t i = 0; i < layers; i += stride[0]) {
-		for(uint16_t j = 0; j < rows; j += stride[1]) {
-			for(uint16_t k = 0; k < cols; k += stride[2]) {
+	for(uint16_t i = 0; i < layers; i += params.stride[0]) {
+		for(uint16_t j = 0; j < rows; j += params.stride[1]) {
+			for(uint16_t k = 0; k < cols; k += params.stride[2]) {
 				fixed w = MAT_GET(src, i, j, k);
-				MAT_SET(dest, w, i / stride[0], j / stride[1], k / stride[2]);
+				MAT_SET(dest, w, i / params.stride[0], 
+					j / params.stride[1], k / params.stride[2]);
 			}
 		}
 	}

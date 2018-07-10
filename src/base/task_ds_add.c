@@ -22,11 +22,6 @@ void task_ds_add() {
 	uint16_t cols = MAT_GET_DIM(src, 1);
 	for(uint16_t i = 0; i < rows; i++) {
 		for(uint16_t j = 0; j < cols; j++) {
-			inc_addr_add(2);
-			inc_addr_mul(2);
-			inc_add(1);
-			inc_ld(2);
-			inc_st(1);
 			fixed w = F_ADD(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}

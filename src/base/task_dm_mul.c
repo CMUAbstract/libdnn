@@ -25,17 +25,9 @@ void task_dm_mul() {
 		for(uint16_t k = 0; k < dcols; k++) {
 			fixed w = 0;
 			for(uint16_t j = 0; j < cols; j++) {
-				inc_addr_add(2);
-				inc_addr_mul(2);
-				inc_mul(1);
-				inc_add(1);
-				inc_ld(3);
 				fixed tmp = F_MUL(MAT_GET(filter, i, j), MAT_GET(src, j, k));
 				w = F_ADD(w, tmp);
 			}
-			inc_addr_add(1);
-			inc_addr_mul(1);
-			inc_st(1);
 			MAT_SET(dest, w, i, k);
 		}
 	}

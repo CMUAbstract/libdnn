@@ -20,11 +20,12 @@ void task_ds_mul() {
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 	uint16_t rows = MAT_GET_DIM(src, 0);
 	uint16_t cols = MAT_GET_DIM(src, 1);
-	for(uint16_t i = 0; i < rows; i++) {
-		for(uint16_t j = 0; j < cols; j++) {
+	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = ++CUR_SCRATCH[0]) {
+		for(uint16_t j = CUR_SCRATCH[1]; j < cols; j = ++CUR_SCRATCH[1]) {
 			fixed w = F_MUL(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
 		}
+		CUR_SCRATCH[1] = 0;
 	}
 	POP_STACK(mat_stack, 3);
 	setup_cleanup(CUR_TASK);
