@@ -8,6 +8,14 @@ OBJECTS = nn.o state.o linalg.o buffer.o profile.o cleanup.o misc.o \
 		$(LIBDNN_BACKEND)/task_dm_conv.o $(LIBDNN_BACKEND)/task_sm_mul.o \
 		$(LIBDNN_BACKEND)/task_svm_mul.o $(LIBDNN_BACKEND)/task_sm_conv.o
 
+ifeq ($(LIBDNN_BACKEND), lea)
+OBJECTS += $(LIBDNN_BACKEND)/lea.o
+endif
+
+ifeq ($(LIBDNN_BACKEND), tile)
+OBJECTS += $(LIBDNN_BACKEND)/tile.o
+endif
+
 DEPS = libio libalpaca libfixed libmat
 
 override SRC_ROOT = ../../src
