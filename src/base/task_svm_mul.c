@@ -27,7 +27,7 @@ void task_svm_mul() {
 		fixed w = 0;
 		for(uint16_t j = start; j < end; j++) {
 			w = F_ADD(w, F_MUL(MAT_GET(filter, j), 
-				MAT_GET(src, filter->sparse.offsets[j])));
+				MAT_GET(src, filter->sparse.offsets[j], 0)));
 		}
 		MAT_SET(dest, w, i, 0);
 	}

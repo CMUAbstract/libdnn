@@ -4,7 +4,7 @@
 #include <libfixed/fixed.h>
 
 #define MAT_BUF_NUMBER 3
-#define LAYER_BUF_NUMBER 3
+#define LAYER_BUF_NUMBER 4
 
 #define TASK_UID_INIT_OFFSET 40
 

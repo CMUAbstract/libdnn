@@ -10,6 +10,7 @@
 #include "mem.h"
 #include "state.h"
 #include "misc.h"
+#include "cleanup.h"
 
 // Public tasks
 TASK(TASK_UID_NONLINEAR_OFFSET + 1, task_pool);

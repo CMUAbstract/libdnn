@@ -15,7 +15,7 @@ TASK(TASK_UID_BLAS_OFFSET + 8, task_sm_mul);
 
 // Sparse matrix multiplication
 void task_sm_mul() {
-	mat_t *src = PEEK_STACK(mat_stack, 0);
+	/*mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *inter = inter1;
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
@@ -74,5 +74,5 @@ void task_sm_mul() {
 	if(pos < total_elements - 1) transition_to(CUR_TASK);
 	POP_STACK(mat_stack, 3);
 	setup_cleanup(CUR_TASK);
-	TRANSITION_TO(task_cleanup);
+	TRANSITION_TO(task_cleanup);*/
 }
