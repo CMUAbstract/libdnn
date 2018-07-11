@@ -9,26 +9,14 @@
 #include "mem.h"
 #include "state.h"
 #include "misc.h"
+#include "cleanup.h"
+#include "tile.h"
 
 // Public tasks
 TASK(TASK_UID_NONLINEAR_OFFSET + 1, task_pool);
 TASK(TASK_UID_NONLINEAR_OFFSET + 2, task_relu);
 TASK(TASK_UID_NONLINEAR_OFFSET + 3, task_filter);
 TASK(TASK_UID_NONLINEAR_OFFSET + 4, task_transpose);
-
-// Private tasks
-void task_cleanup_nonlinear();
-TASK(TASK_UID_NONLINEAR_OFFSET + 5, task_cleanup_nonlinear);
-
-static __fram uint16_t scratch_bak[SCRATCH_SIZE];
-
-// Resets a task
-static __fram task_t *last_task;
-void task_cleanup_nonlinear() {
-	PRINTF("\r\n Cleaning up NN");
-	memset(last_task->info.scratch, 0, sizeof(unsigned int) * SCRATCH_SIZE);
-	transition_to(last_task->info.return_task);
-}
 
 void task_pool() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
@@ -59,17 +47,20 @@ void task_pool() {
 		scratch_bak[1] = CUR_SCRATCH[1] + stride[1];
 	}
 	scratch_bak[2] = (k + stride[2] == cols) ? 0 : CUR_SCRATCH[2] + stride[2];
-	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
-	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
-	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
+	write_to_gbuf((uint8_t *)(scratch_bak), 
+		(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+	write_to_gbuf((uint8_t *)(scratch_bak + 1), 
+		(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
+	write_to_gbuf((uint8_t *)(scratch_bak + 2), 
+		(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 	if(!(CUR_SCRATCH[0] + 1 == layers &&
 		 CUR_SCRATCH[1] + stride[1] == rows &&
 		 CUR_SCRATCH[2] + stride[2] == cols)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 2);
-	last_task = CUR_TASK;
-	TRANSITION_TO(task_cleanup_nonlinear);
+	setup_cleanup(CUR_TASK);
+	TRANSITION_TO(task_cleanup);
 }
 
 void task_filter() {
@@ -95,17 +86,20 @@ void task_filter() {
 		scratch_bak[1] = CUR_SCRATCH[1] + stride[1];
 	}
 	scratch_bak[2] = (k + stride[1] == cols) ? 0 : CUR_SCRATCH[2] + stride[2];
-	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
-	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
-	write_to_gbuf((uint8_t *)(scratch_bak + 2), (uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
+	write_to_gbuf((uint8_t *)(scratch_bak), 
+		(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+	write_to_gbuf((uint8_t *)(scratch_bak + 1), 
+		(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
+	write_to_gbuf((uint8_t *)(scratch_bak + 2), 
+		(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 	if(!(CUR_SCRATCH[0] + stride[0] == layers &&
 		 CUR_SCRATCH[1] + stride[1] == rows &&
 		 CUR_SCRATCH[2] + stride[2] == cols)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 2);
-	last_task = CUR_TASK;
-	TRANSITION_TO(task_cleanup_nonlinear);
+	setup_cleanup(CUR_TASK);
+	TRANSITION_TO(task_cleanup);
 }
 
 void task_relu() {
@@ -123,13 +117,14 @@ void task_relu() {
 		*(dest->data + idx_i) = (F_LT(max, F_LIT(0.0))) ? F_LIT(0.0) : max;
 	}
 	scratch_bak[0] = CUR_SCRATCH[0] + tile_size;
-	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+	write_to_gbuf((uint8_t *)(scratch_bak), 
+		(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 	if(!(CUR_SCRATCH[0] + tile_size == total_elements)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 2);
-	last_task = CUR_TASK;
-	TRANSITION_TO(task_cleanup_nonlinear);
+	setup_cleanup(CUR_TASK);
+	TRANSITION_TO(task_cleanup);
 }
 
 void task_transpose() {
@@ -147,15 +142,21 @@ void task_transpose() {
 			MAT_SET(dest, val, idx_j, idx_i);
 		}
 	}
-	scratch_bak[0] = (CUR_SCRATCH[1] + tile_size_x == cols) ? CUR_SCRATCH[0] + tile_size_y : 0;
-	scratch_bak[1] = (CUR_SCRATCH[1] + tile_size_x == cols) ? 0 : CUR_SCRATCH[1] + tile_size_x;
-	write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
-	write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
+	scratch_bak[0] = 0;
+	scratch_bak[1] = CUR_SCRATCH[1] + tile_size_x;
+	if(CUR_SCRATCH[1] + tile_size_x == cols) {
+		scratch_bak[0] = CUR_SCRATCH[0] + tile_size_y;
+		scratch_bak[1] = 0;
+	}
+	write_to_gbuf((uint8_t *)(scratch_bak), 
+		(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+	write_to_gbuf((uint8_t *)(scratch_bak + 1), 
+		(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 	if(!(CUR_SCRATCH[0] + tile_size_y == rows &&
 		 CUR_SCRATCH[1] + tile_size_x == cols)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 2);
-	last_task = CUR_TASK;
-	TRANSITION_TO(task_cleanup_nonlinear);
+	setup_cleanup(CUR_TASK);
+	TRANSITION_TO(task_cleanup);
 }

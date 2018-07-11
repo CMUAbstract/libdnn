@@ -845,7 +845,7 @@ void task_sm_mul() {
 	TRANSITION_TO(task_cleanup);
 }
 
-#if 0
+#if 1
 void task_sm_conv() {
 	check_calibrate();
 	mat_t *src = PEEK_STACK(mat_stack, 0);
