@@ -10,10 +10,24 @@
 #include "mem.h"
 #include "state.h"
 #include "misc.h"
+#include "cleanup.h"
 
 void task_calibrate();
 TASK(TASK_UID_BLAS_OFFSET + 12, task_calibrate);
 
+#ifndef MSP_DISABLE_LEA
+DSPLIB_DATA(tsrc1, 2) fixed tsrc1[CONFIG_TILE_SIZE];
+DSPLIB_DATA(tsrc2, 2) fixed tsrc2[CONFIG_TILE_SIZE];
+DSPLIB_DATA(tdest1, 2) fixed tdest1[CONFIG_TILE_SIZE];
+DSPLIB_DATA(tdest2, 2) fixed tdest2[CONFIG_TILE_SIZE];
+#else
+__fram fixed tsrc1[CONFIG_TILE_SIZE];
+__fram fixed tsrc2[CONFIG_TILE_SIZE];
+__fram fixed tdest1[CONFIG_TILE_SIZE];
+__fram fixed tdest2[CONFIG_TILE_SIZE];
+#endif
+
+__fram DMA_initParam dma_config;
 static __fram bool DMA_initialized = false;
 static __fram uint16_t tile_size = 0;
 
@@ -21,14 +35,12 @@ uint16_t check_calibrate(void){
 	if(!DMA_initialized) {
 		PRINTF("\r\n Initializing DMA");
 		DMA_disableTransferDuringReadModifyWrite();
-		for(uint16_t i = 0; i < 3; i++) {
-			dmaConfig[i].channelSelect = i << 4;
-			dmaConfig[i].transferModeSelect = DMA_TRANSFER_BLOCK;
-			dmaConfig[i].transferUnitSelect = DMA_SIZE_SRCWORD_DSTWORD;
-			DMA_init(&dmaConfig[i]);
-			DMA_enableInterrupt(dmaConfig[i].channelSelect);
-		}
-		DMA_initialized = 1;
+		dma_config.channelSelect = 0;
+		dma_config.transferModeSelect = DMA_TRANSFER_BLOCK;
+		dma_config.transferUnitSelect = DMA_SIZE_SRCWORD_DSTWORD;
+		DMA_init(&dma_config);
+		DMA_enableInterrupt(dma_config.channelSelect);
+		DMA_initialized = true;
 	}
 	if(tile_size != 0) return tile_size;
 	TASK_REF(task_calibrate)->info.return_task = CUR_TASK;
@@ -82,7 +94,7 @@ void task_calibrate() {
 		CUR_SCRATCH[0] = 2;
 		msp_mac_q15_params params = {.length = CUR_SCRATCH[1]};
 		msp_status status;
-		status = msp_mac_q15(&params, tsrc1, tsrc2, tdest);
+		status = msp_mac_q15(&params, tsrc1, tsrc2, tdest1);
 		PRINTF("\r\n Done init: status: %u tile_size %u", status, CUR_SCRATCH[1]);
 		msp_checkStatus(status);
 		write_to_gbuf((uint8_t *)(CUR_SCRATCH + 1),
@@ -97,7 +109,7 @@ void task_calibrate() {
 			(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		transition_to(CUR_TASK);	
 	}
-	last_task = CUR_TASK;
+	setup_cleanup(CUR_TASK);
 	TRANSITION_TO(task_cleanup);
 }
 

@@ -15,11 +15,12 @@
 TASK(TASK_UID_BLAS_OFFSET + 10, task_sm_conv);
 
 static __fram mat_t buf = {.data = MAT_BUFFER(0)};
-static __fram mat_t *inter = &buf;
+static __fram mat_t *buffer = &buf;
 
 void task_sm_conv() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *inter = buffer;
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
 	uint16_t rows = MAT_GET_DIM(dest, 0);

@@ -15,12 +15,13 @@
 TASK(TASK_UID_BLAS_OFFSET + 9, task_svm_mul);
 
 static __fram mat_t buf = {.data = LAYER_BUFFER(3)};
-static __fram mat_t *inter = &buf;
+static __fram mat_t *buffer = &buf;
 
 // Sparse vector-matrix multiplication
 void task_svm_mul() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *inter = buffer;
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
 	uint16_t rows = MAT_GET_DIM(dest, 0);

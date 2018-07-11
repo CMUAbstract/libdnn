@@ -15,12 +15,13 @@
 TASK(TASK_UID_BLAS_OFFSET + 6, task_dm_conv);
 
 static __fram mat_t buf = {.data = MAT_BUFFER(0)};
-static __fram mat_t *inter = &buf;
+static __fram mat_t *buffer = &buf;
 
 // Dense matrix convolution
 void task_dm_conv() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *inter = buffer;
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
 
 	uint16_t rows = MAT_GET_DIM(dest, 0);
@@ -57,7 +58,7 @@ void task_dm_conv() {
 				j_stride++;
 				continue;
 			}
-			w = F_ADD(w, MAT_GET(dest, i_stride, j_stride));
+			w = F_ADD(w, MAT_GET(inter, i_stride, j_stride));
 			MAT_SET(dest, w, i_stride, j_stride);
 			j_stride++;
 		}
