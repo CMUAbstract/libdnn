@@ -16,6 +16,8 @@
 #include "cleanup.h"
 
 TASK(TASK_UID_BLAS_OFFSET + 10, task_sm_conv);
+static __fram mat_t buf = {.data = MAT_BUFFER(0)};
+static __fram mat_t *buffer = &buf;
 
 // Dense matrix multiplication
 void task_sm_conv() {
