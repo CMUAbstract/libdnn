@@ -112,6 +112,7 @@ void task_dm_conv() {
 	uint16_t k = CUR_SCRATCH[0];
 	uint16_t l = CUR_SCRATCH[1];
 	uint16_t n = CUR_SCRATCH[2];
+	if(!params.same_padding) cols = MAT_GET_DIM(src, 2);
 	uint16_t common_tile_size = greatest_tile_size(cols, tile_size);
 	uint16_t filter_tile_size = greatest_tile_size(fcols, tile_size);
 	if(CUR_SCRATCH[5] + common_tile_size >= cols) 
