@@ -124,7 +124,8 @@ void task_sm_conv() {
 	if(!CUR_SCRATCH[2]) {
 		uint16_t start_idx = idx;
 		uint16_t f = 0;
-		while(pos < total_elements - 1 && 
+		if(pos == 0) idx += filter->sparse.offsets[pos];
+		while(pos < total_elements && 
 			(start_idx - idx) < filter_tile_size) {
 			coalesced_filter[f] = MAT_GET(filter, pos);
 			pos++;
