@@ -30,23 +30,23 @@ void task_pool() {
 	uint16_t j = CUR_SCRATCH[1];
 	uint16_t k = CUR_SCRATCH[2];
 	fixed max = MAT_GET(src, i, j, k);
-	for(uint16_t l = 0; l < size[1]; l ++) {
-		for(uint16_t m = 0; m < size[2]; m ++) {
+	for(uint16_t l = 0; l < params.size[1]; l ++) {
+		for(uint16_t m = 0; m < params.size[2]; m ++) {
 			fixed val = MAT_GET(src, i, j + l, k + m);
 			if(F_LT(max, val))
 				max = val;
 		}
 	}
-	MAT_SET(dest, max, i, j / stride[1], k / stride[2]);
+	MAT_SET(dest, max, i, j / params.stride[1], k / params.stride[2]);
 	scratch_bak[0] = CUR_SCRATCH[0];
 	scratch_bak[1] = CUR_SCRATCH[1];
-	if(j + stride[1] == rows && k + stride[2] == cols) {
+	if(j + params.stride[1] == rows && k + params.stride[2] == cols) {
 		scratch_bak[0] = CUR_SCRATCH[0] + 1;
 		scratch_bak[1] = 0;
-	} else if(k + stride[2] == cols) {
-		scratch_bak[1] = CUR_SCRATCH[1] + stride[1];
+	} else if(k + params.stride[2] == cols) {
+		scratch_bak[1] = CUR_SCRATCH[1] + params.stride[1];
 	}
-	scratch_bak[2] = (k + stride[2] == cols) ? 0 : CUR_SCRATCH[2] + stride[2];
+	scratch_bak[2] = (k + params.stride[2] == cols) ? 0 : CUR_SCRATCH[2] + params.stride[2];
 	write_to_gbuf((uint8_t *)(scratch_bak), 
 		(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 	write_to_gbuf((uint8_t *)(scratch_bak + 1), 
@@ -54,8 +54,8 @@ void task_pool() {
 	write_to_gbuf((uint8_t *)(scratch_bak + 2), 
 		(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 	if(!(CUR_SCRATCH[0] + 1 == layers &&
-		 CUR_SCRATCH[1] + stride[1] == rows &&
-		 CUR_SCRATCH[2] + stride[2] == cols)) {
+		 CUR_SCRATCH[1] + params.stride[1] == rows &&
+		 CUR_SCRATCH[2] + params.stride[2] == cols)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 2);
@@ -76,25 +76,25 @@ void task_filter() {
 	uint16_t k = CUR_SCRATCH[2];
 
 	fixed w = MAT_GET(src, i, j, k);
-	MAT_SET(dest, w, i / stride[0], j / stride[1], k / stride[2]);
+	MAT_SET(dest, w, i / params.stride[0], j / params.stride[1], k / params.stride[2]);
 	scratch_bak[0] = CUR_SCRATCH[0];
 	scratch_bak[1] = CUR_SCRATCH[1];
-	if(j + stride[1] == rows && k + stride[2] == cols) {
-		scratch_bak[0] = CUR_SCRATCH[0] + stride[0];
+	if(j + params.stride[1] == rows && k + params.stride[2] == cols) {
+		scratch_bak[0] = CUR_SCRATCH[0] + params.stride[0];
 		scratch_bak[1] = 0;
-	} else if(k + stride[1] == cols) {
-		scratch_bak[1] = CUR_SCRATCH[1] + stride[1];
+	} else if(k + params.stride[1] == cols) {
+		scratch_bak[1] = CUR_SCRATCH[1] + params.stride[1];
 	}
-	scratch_bak[2] = (k + stride[1] == cols) ? 0 : CUR_SCRATCH[2] + stride[2];
+	scratch_bak[2] = (k + params.stride[1] == cols) ? 0 : CUR_SCRATCH[2] + params.stride[2];
 	write_to_gbuf((uint8_t *)(scratch_bak), 
 		(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 	write_to_gbuf((uint8_t *)(scratch_bak + 1), 
 		(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 	write_to_gbuf((uint8_t *)(scratch_bak + 2), 
 		(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
-	if(!(CUR_SCRATCH[0] + stride[0] == layers &&
-		 CUR_SCRATCH[1] + stride[1] == rows &&
-		 CUR_SCRATCH[2] + stride[2] == cols)) {
+	if(!(CUR_SCRATCH[0] + params.stride[0] == layers &&
+		 CUR_SCRATCH[1] + params.stride[1] == rows &&
+		 CUR_SCRATCH[2] + params.stride[2] == cols)) {
 		transition_to(CUR_TASK);
 	}
 	POP_STACK(mat_stack, 2);

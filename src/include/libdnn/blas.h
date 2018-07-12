@@ -18,7 +18,7 @@
 #endif
 
 #define TASK_UID_BLAS_OFFSET 10
-#define SHIFT 7
+#define SHIFT 5
 
 void task_ds_zero();
 void task_ds_add();

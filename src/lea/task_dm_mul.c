@@ -85,8 +85,8 @@ void task_dm_mul() {
 			// Do dot product here
 			status = msp_mac_q15(&params, tsrc1, tsrc2, tdest1);
 			msp_checkStatus(status);
-			// fixed w = ((*tdest1 >> 1) + F_K) >> F_N;
-			fixed w = *tdest1 >> 1;
+			fixed w = ((*tdest1 >> 1) + F_K) >> F_N;
+			// fixed w = *tdest1 >> 1;
 			// PRINTF("\r\n i: %u j: %u k: %u filter: %i src: %i tsrc1: %i tsrc2: %i dest: %i", 
 				// i, j, k, *MAT_PTR(filter, i, k), *MAT_PTR(src, k, j), tsrc1[0], tsrc2[0], w);
 			if(k > 0) {

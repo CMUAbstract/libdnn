@@ -123,15 +123,20 @@ void task_sm_conv() {
 
 	// Create filter
 	if(!CUR_SCRATCH[2]) {
-		uint16_t start_idx = idx;
-		uint16_t f = 0;
 		if(pos == 0) idx += filter->sparse.offsets[pos];
+		uint16_t start_idx = idx;
+		uint16_t f = idx % filter_tile_size;
+		uint16_t start_row = n;
+		uint16_t cur_row = start_row;
 		while(pos < total_elements && 
-			(idx - start_idx) < filter_tile_size) {
+			(idx - start_idx) < filter_tile_size && 
+			f < filter_tile_size &&
+			cur_row == start_row) {
 			coalesced_filter[f] = MAT_GET(filter, pos);
 			pos++;
 			f += filter->sparse.offsets[pos];
 			idx += filter->sparse.offsets[pos];
+			cur_row = idx % fcols;
 		}
 		scratch_bak[0] = pos;
 		scratch_bak[1] = idx;
@@ -157,7 +162,8 @@ void task_sm_conv() {
 			tsrc1[filter_length - i - 1] = 0;
 			continue;
 		}
-		tsrc1[filter_length - i - 1] = coalesced_filter[i] << (SHIFT + 1);
+		// tsrc1[filter_length - i - 1] = coalesced_filter[i] << (SHIFT + 1);
+		tsrc1[filter_length - i - 1] = coalesced_filter[i] << SHIFT;
 	}
 	// PRINTF("\r\nFilter ");
 	// for(uint16_t i = 0; i < filter_length; i++) {
@@ -178,7 +184,6 @@ void task_sm_conv() {
 					sizeof(fixed) * common_tile_size);	
 			}
 			status = msp_fir_q15(&params_fir, tsrc2, tdest1);
-			// PRINTF("\r\n status: %u", status);
 			msp_checkStatus(status);
 			// PRINTF("\r\n i: %u j: %u k: %u l: %u n: %u tsrc1: %i tsrc2: %i tdest1: %i inter: %i",
 				// i, j, k, l, n, tsrc1[0], tsrc2[0], tdest1[0], MAT_GET(inter, 0, 0));
@@ -229,7 +234,6 @@ void task_sm_conv() {
 		CUR_SCRATCH[5] = 0;
 		common_tile_size = greatest_tile_size(cols, tile_size);
 	}
-
 	scratch_bak[3] = CUR_SCRATCH[3] ^ 0x01;
 	scratch_bak[4] = 0;
 	write_to_gbuf((uint8_t *)(scratch_bak), 
