@@ -18,6 +18,7 @@
 TASK(TASK_UID_BLAS_OFFSET + 10, task_sm_conv);
 static __fram mat_t buf = {.data = MAT_BUFFER(0)};
 static __fram mat_t *buffer = &buf;
+static __fram fixed coalesced_filter[CONFIG_TILE_SIZE];
 
 // Dense matrix multiplication
 void task_sm_conv() {
@@ -106,15 +107,38 @@ void task_sm_conv() {
 		TRANSITION_TO(task_cleanup);	
 	}
 
-	/*uint16_t k = CUR_SCRATCH[0];
-	uint16_t l = CUR_SCRATCH[1];
-	uint16_t n = CUR_SCRATCH[2];
+	uint16_t pos = CUR_SCRATCH[0];
+	uint16_t idx = CUR_SCRATCH[1];
+
+	uint16_t k = idx / (fcols * frows); // Layers
+	uint16_t l = (idx % (fcols * frows)) / fcols; // Rows
+	uint16_t n = idx % fcols; // Cols
 	uint16_t common_tile_size = greatest_tile_size(cols, tile_size);
 	uint16_t filter_tile_size = greatest_tile_size(fcols, tile_size);
 	if(CUR_SCRATCH[5] + common_tile_size >= cols) 
 		common_tile_size = cols - CUR_SCRATCH[5];
 	if(n + filter_tile_size >= fcols) 
 		filter_tile_size = fcols - n;
+
+	// Create filter
+	if(!CUR_SCRATCH[2]) {
+		uint16_t start_idx = idx;
+		uint16_t f = 0;
+		while(pos < total_elements - 1 && 
+			(start_idx - idx) < filter_tile_size) {
+			coalesced_filter[f] = MAT_GET(filter, pos);
+			pos++;
+			f += filter->sparse.offsets[pos] - idx;
+			idx += filter->sparse.offsets[pos];
+		}
+		scratch_bak[0] = pos;
+		scratch_bak[1] = idx;
+		scratch_bak[2] = 1;
+		write_to_gbuf((uint8_t *)(scratch_bak + 2), 
+			(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
+		transition_to(CUR_TASK);
+	}
+
 	msp_status status;
 	uint16_t filter_length = filter_tile_size + (filter_tile_size & 0x01);
 	msp_fir_q15_params params_fir = {
@@ -131,7 +155,7 @@ void task_sm_conv() {
 			tsrc1[filter_length - i - 1] = 0;
 			continue;
 		}
-		tsrc1[filter_length - i - 1] = MAT_GET(filter, k, l, n + i) << (SHIFT + 1);
+		tsrc1[filter_length - i - 1] = coalesced_filter[i] << (SHIFT + 1);
 	}
 	for(uint16_t i = CUR_SCRATCH[4]; i < rows; i = ++CUR_SCRATCH[4]) {
 		for(uint16_t j = CUR_SCRATCH[5]; j < cols; j = (CUR_SCRATCH[5] += common_tile_size)) {
@@ -196,43 +220,27 @@ void task_sm_conv() {
 					sizeof(fixed) * common_tile_size);
 				// PRINTF("\r\n %i dest: %i inter: %i", 
 					// tdest2[0], MAT_GET(dest, 0, 0), MAT_GET(inter, 0, 0));
-
 			}
 		}
 		CUR_SCRATCH[5] = 0;
 		common_tile_size = greatest_tile_size(cols, tile_size);
 	}
 
-	scratch_bak[0] = k;
-	scratch_bak[1] = l;
-	scratch_bak[2] = n + filter_tile_size;
-	if(n + filter_tile_size >= fcols && l + 1 >= frows) {
-		scratch_bak[0] = k + 1;
-		scratch_bak[1] = 0;
-		scratch_bak[2] = 0;
-	}else if(n + filter_tile_size >= fcols) {
-		scratch_bak[1] = l + 1;
-		scratch_bak[2] = 0;
-	}
-
-	scratch_bak[3] = CUR_SCRATCH[3] ^ 0x01;	
-	scratch_bak[4] = 0;
 	write_to_gbuf((uint8_t *)(scratch_bak), 
-		(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+			(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
 	write_to_gbuf((uint8_t *)(scratch_bak + 1), 
-		(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
-	write_to_gbuf((uint8_t *)(scratch_bak + 2), 
-		(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
-	write_to_gbuf((uint8_t *)(scratch_bak + 4), 
-		(uint8_t *)(CUR_SCRATCH + 4), sizeof(uint16_t));
+			(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 	if(!(k + 1 >= flayers && l + 1 >= frows && n + common_tile_size >= fcols)) {
+		scratch_bak[2] = 0;
+		write_to_gbuf((uint8_t *)(scratch_bak + 2), 
+			(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 		write_to_gbuf((uint8_t *)(scratch_bak + 3), 
 			(uint8_t *)(CUR_SCRATCH + 3), sizeof(uint16_t));
 		memset(tsrc1, 0, sizeof(fixed) * greatest_tile_size(fcols, tile_size));
 		memset(tsrc2, 0, sizeof(fixed) * common_tile_size);
 		memset(tdest1, 0, sizeof(fixed) * common_tile_size);
 		transition_to(CUR_TASK);
-	}*/
+	}
 
 	if(CUR_SCRATCH[3]) {
 		for(uint16_t i = CUR_SCRATCH[6]; i < rows; i = (++CUR_SCRATCH[6])){
