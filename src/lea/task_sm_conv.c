@@ -57,24 +57,27 @@ void task_sm_conv() {
 
 		uint16_t i_stride = CUR_SCRATCH[4] / params.stride[1];
 		uint16_t j_stride = CUR_SCRATCH[5] / params.stride[2];
+		fixed f = MAT_GET(filter, pos);
+		fixed *inter_ptr = MAT_PTR(inter, i_stride, j_stride);
+		fixed *dest_ptr = MAT_PTR(dest, i_stride, j_stride);
 		for(uint16_t i = CUR_SCRATCH[4]; 
 			i < rows * params.stride[1]; i = (CUR_SCRATCH[4] += params.stride[1])){
+			fixed *src_ptr = MAT_PTR(src, k, i + l, CUR_SCRATCH[5] + n);
 			for(uint16_t j = CUR_SCRATCH[5]; 
 				j < cols * params.stride[2]; j = (CUR_SCRATCH[5] += params.stride[2])){
 				fixed w = 0;
 				if(!params.same_padding || (i + l < MAT_GET_DIM(src, 1) && 
 					j + n < MAT_GET_DIM(src, 2))) {
-					w = F_MUL(MAT_GET(filter, pos), 
-						(MAT_GET(src, k, i + l, j + n) >> SHIFT));
+					w = F_MUL(f, (*src_ptr >> SHIFT));
 				}
 				if(!zero) {
-					w = F_ADD(w, MAT_GET(inter, i_stride, j_stride)); // Zero
+					w = F_ADD(w, *inter_ptr); // Zero
+					inter_ptr++;
 				}
-				MAT_SET(dest, w, i_stride, j_stride);
-				j_stride++;
+				*dest_ptr = w;
+				dest_ptr++;
+				src_ptr += params.stride[2];
 			}
-			j_stride = 0;
-			i_stride++;
 			CUR_SCRATCH[5] = 0;
 		}
 
@@ -114,29 +117,27 @@ void task_sm_conv() {
 	uint16_t k = idx / (fcols * frows); // Layers
 	uint16_t l = (idx % (fcols * frows)) / fcols; // Rows
 	uint16_t n = idx % fcols; // Cols
-	uint16_t common_tile_size = greatest_tile_size(cols, tile_size);
 	uint16_t filter_tile_size = greatest_tile_size(fcols, tile_size);
-	if(CUR_SCRATCH[5] + common_tile_size >= cols) 
-		common_tile_size = cols - CUR_SCRATCH[5];
-	if(n + filter_tile_size >= fcols) 
-		filter_tile_size = fcols - n;
+	if(n + filter_tile_size >= fcols) filter_tile_size = fcols - n;
+	uint16_t filter_length = filter_tile_size + (filter_tile_size & 0x01);
+
+	uint16_t common_tile_size = greatest_tile_size(cols, tile_size);
+	uint16_t common_rows = tile_size / (cols + filter_length);
+	if(common_rows == 0) common_rows = 1;
+	else if(common_rows > rows) common_rows = rows;
+	uint16_t common_cols = common_tile_size; 
+	common_tile_size *= common_rows; 
 
 	// Create filter
 	if(!CUR_SCRATCH[2]) {
 		if(pos == 0) idx += filter->sparse.offsets[pos];
-		uint16_t start_idx = idx;
 		uint16_t f = idx % filter_tile_size;
-		uint16_t start_row = n;
-		uint16_t cur_row = start_row;
 		while(pos < total_elements && 
-			(idx - start_idx) < filter_tile_size && 
-			f < filter_tile_size &&
-			cur_row == start_row) {
+			f < filter_tile_size) {
 			coalesced_filter[f] = MAT_GET(filter, pos);
 			pos++;
 			f += filter->sparse.offsets[pos];
 			idx += filter->sparse.offsets[pos];
-			cur_row = idx % fcols;
 		}
 		scratch_bak[0] = pos;
 		scratch_bak[1] = idx;
@@ -147,15 +148,11 @@ void task_sm_conv() {
 	}
 
 	msp_status status;
-	uint16_t filter_length = filter_tile_size + (filter_tile_size & 0x01);
 	msp_fir_q15_params params_fir = {
-		.length = common_tile_size + (common_tile_size & 0x01),
 		.coeffs = tsrc1,
 		.tapLength = filter_length,
 	};
-	msp_add_q15_params params_add = {
-		.length = common_tile_size + (common_tile_size & 0x01)
-	};		
+	msp_add_q15_params params_add;		
 
 	for(uint16_t i = 0; i < filter_length; i++) {
 		if((filter_tile_size & 0x01) && i == filter_length - 1) {
@@ -169,70 +166,99 @@ void task_sm_conv() {
 	// for(uint16_t i = 0; i < filter_length; i++) {
 	// 	PRINTF("%i ", tsrc1[i]);
 	// }
-	for(uint16_t i = CUR_SCRATCH[4]; i < rows; i = ++CUR_SCRATCH[4]) {
-		for(uint16_t j = CUR_SCRATCH[5]; j < cols; j = (CUR_SCRATCH[5] += common_tile_size)) {
-			if(common_tile_size > 12 DMA_ENABLE) { // Load activation tile
-				DMA_setTransferSize(dma_config.channelSelect, common_tile_size);
-			    DMA_setSrcAddress(dma_config.channelSelect, 
-					(uint32_t) MAT_PTR(src, k, i + l, j + n), DMA_DIRECTION_INCREMENT);
-			    DMA_setDstAddress(dma_config.channelSelect, (uint32_t) (tsrc2),
-					DMA_DIRECTION_INCREMENT);
-				DMA_enableTransfers(dma_config.channelSelect);
-			    DMA_startSleepTransfer(dma_config.channelSelect);
-			} else {
-				memcpy(tsrc2, MAT_PTR(src, k, i + l, j + n), 
-					sizeof(fixed) * common_tile_size);	
-			}
-			status = msp_fir_q15(&params_fir, tsrc2, tdest1);
-			msp_checkStatus(status);
-			// PRINTF("\r\n i: %u j: %u k: %u l: %u n: %u tsrc1: %i tsrc2: %i tdest1: %i inter: %i",
-				// i, j, k, l, n, tsrc1[0], tsrc2[0], tdest1[0], MAT_GET(inter, 0, 0));
-			if(k == 0 && l == 0 && n == 0) { // Zero
-				if(common_tile_size > 12 DMA_ENABLE) {
-					DMA_setTransferSize(dma_config.channelSelect, common_tile_size);
+	uint16_t row_step = common_rows;
+	for(uint16_t i = CUR_SCRATCH[4]; i < rows; 
+		i = (CUR_SCRATCH[4] += row_step)) {
+		for(uint16_t j = CUR_SCRATCH[5]; j < cols; 
+			j = (CUR_SCRATCH[5] += common_tile_size)) {
+			params_fir.length = common_tile_size + row_step * filter_length;
+			params_fir.length += params_fir.length & 0x01;
+			params_add.length = params_fir.length;
+			for(uint16_t g = 0; g < row_step; g++) {
+				if(common_tile_size > 12 DMA_ENABLE) { // Load activation tile
+					DMA_setTransferSize(dma_config.channelSelect, 
+						common_cols);
 				    DMA_setSrcAddress(dma_config.channelSelect, 
-						(uint32_t) (tdest1), DMA_DIRECTION_INCREMENT);
+						(uint32_t) MAT_PTR(src, k, i + l + g, j + n), 
+						DMA_DIRECTION_INCREMENT);
 				    DMA_setDstAddress(dma_config.channelSelect, 
-				    	(uint32_t) (MAT_PTR(dest, i, j)), DMA_DIRECTION_INCREMENT);
+				    	(uint32_t) (tsrc2 + g * (cols + filter_length)), 
+				    	DMA_DIRECTION_INCREMENT);
 					DMA_enableTransfers(dma_config.channelSelect);
 				    DMA_startSleepTransfer(dma_config.channelSelect);
 				} else {
-					memcpy(MAT_PTR(dest, i, j), tdest1, 
-						sizeof(fixed) * common_tile_size);	
+					memcpy(tsrc2 + g * (cols + filter_length), 
+						MAT_PTR(src, k, i + l + g, j + n), 
+						sizeof(fixed) * common_cols);	
+				}
+			}
+			status = msp_fir_q15(&params_fir, tsrc2, tdest1);
+			msp_checkStatus(status);
+			// PRINTF("\r\n i: %u j: %u k: %u l: %u n: %u tsrc1: %i tsrc2: %i tdest1: %i inter: %i row_step: %u  common_cols: %u, common_tile_size: %u",
+				// i, j, k, l, n, tsrc1[0], tsrc2[0], tdest1[0], MAT_GET(inter, 0, 0), row_step, common_cols, common_tile_size);
+			if(k == 0 && l == 0 && n == 0) { // Zero
+				for(uint16_t g = 0; g < row_step; g++) {
+					if(common_tile_size > 12 DMA_ENABLE) {
+						DMA_setTransferSize(dma_config.channelSelect, 
+							common_cols);
+					    DMA_setSrcAddress(dma_config.channelSelect, 
+							(uint32_t) (tdest1 + g * (cols + filter_length)), 
+							DMA_DIRECTION_INCREMENT);
+					    DMA_setDstAddress(dma_config.channelSelect, 
+					    	(uint32_t) (MAT_PTR(dest, i + g, j)), 
+					    	DMA_DIRECTION_INCREMENT);
+						DMA_enableTransfers(dma_config.channelSelect);
+					    DMA_startSleepTransfer(dma_config.channelSelect);
+					} else {
+						memcpy(MAT_PTR(dest, i + g, j), 
+							tdest1 + g * (cols + filter_length), 
+							sizeof(fixed) * common_cols);	
+					}
 				}
 				continue;
 			}
-			if(common_tile_size > 12 DMA_ENABLE) { // intermediate
-				DMA_setTransferSize(dma_config.channelSelect, common_tile_size);
-			    DMA_setSrcAddress(dma_config.channelSelect, 
-					(uint32_t) MAT_PTR(inter, i, j), DMA_DIRECTION_INCREMENT);
-			    DMA_setDstAddress(dma_config.channelSelect, (uint32_t) (tsrc2),
-					DMA_DIRECTION_INCREMENT);
-				DMA_enableTransfers(dma_config.channelSelect);
-			    DMA_startSleepTransfer(dma_config.channelSelect);
-			} else {
-				memcpy(tsrc2, MAT_PTR(inter, i, j), 
-					sizeof(fixed) * common_tile_size);	
+			for(uint16_t g = 0; g < row_step; g++) {
+				if(common_tile_size > 12 DMA_ENABLE) { // intermediate
+					DMA_setTransferSize(dma_config.channelSelect, 
+						common_cols);
+				    DMA_setSrcAddress(dma_config.channelSelect, 
+						(uint32_t) MAT_PTR(inter, i + g, j), 
+						DMA_DIRECTION_INCREMENT);
+				    DMA_setDstAddress(dma_config.channelSelect, 
+				    	(uint32_t) (tsrc2 + g * (cols + filter_length)), 
+				    	DMA_DIRECTION_INCREMENT);
+					DMA_enableTransfers(dma_config.channelSelect);
+				    DMA_startSleepTransfer(dma_config.channelSelect);
+				} else {
+					memcpy(tsrc2 + g * (cols + filter_length), 
+						MAT_PTR(inter, i + g, j), 
+						sizeof(fixed) * common_cols);	
+				}
 			}
 			status = msp_add_q15(&params_add, tdest1, tsrc2, tdest2);
 			msp_checkStatus(status);
-			if(common_tile_size > 12 DMA_ENABLE) {
-				DMA_setTransferSize(dma_config.channelSelect, common_tile_size);
-			    DMA_setSrcAddress(dma_config.channelSelect, 
-					(uint32_t) (tdest2), DMA_DIRECTION_INCREMENT);
-			    DMA_setDstAddress(dma_config.channelSelect, 
-			    	(uint32_t) (MAT_PTR(dest, i, j)), DMA_DIRECTION_INCREMENT);
-				DMA_enableTransfers(dma_config.channelSelect);
-			    DMA_startSleepTransfer(dma_config.channelSelect);
-			} else {
-				memcpy(MAT_PTR(dest, i, j), tdest2, 
-					sizeof(fixed) * common_tile_size);
-				// PRINTF("\r\n %i dest: %i inter: %i", 
-				// 	tdest2[0], MAT_GET(dest, 0, 0), MAT_GET(inter, 0, 0));
+			for(uint16_t g = 0; g < row_step; g++) {
+				if(common_tile_size > 12 DMA_ENABLE) {
+					DMA_setTransferSize(dma_config.channelSelect, common_cols);
+				    DMA_setSrcAddress(dma_config.channelSelect, 
+						(uint32_t) (tdest2 + g * (cols + filter_length)), 
+						DMA_DIRECTION_INCREMENT);
+				    DMA_setDstAddress(dma_config.channelSelect, 
+				    	(uint32_t) (MAT_PTR(dest, i + g, j)), 
+				    	DMA_DIRECTION_INCREMENT);
+					DMA_enableTransfers(dma_config.channelSelect);
+				    DMA_startSleepTransfer(dma_config.channelSelect);
+				} else {
+					memcpy(MAT_PTR(dest, i + g, j), 
+						tdest2 + g * (cols + filter_length), 
+						sizeof(fixed) * common_cols);
+					// PRINTF("\r\n %i dest: %i inter: %i", 
+					// 	tdest2[0], MAT_GET(dest, 0, 0), MAT_GET(inter, 0, 0));
+				}
 			}
 		}
+		if(i + common_rows >= rows) row_step = rows - i;
 		CUR_SCRATCH[5] = 0;
-		common_tile_size = greatest_tile_size(cols, tile_size);
 	}
 	scratch_bak[3] = CUR_SCRATCH[3] ^ 0x01;
 	scratch_bak[4] = 0;
@@ -242,15 +268,13 @@ void task_sm_conv() {
 			(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 	write_to_gbuf((uint8_t *)(scratch_bak + 4), 
 			(uint8_t *)(CUR_SCRATCH + 4), sizeof(uint16_t));
-	if(scratch_bak[0] < total_elements - 1) {
+	if(scratch_bak[0] < total_elements) {
 		scratch_bak[2] = 0;
 		write_to_gbuf((uint8_t *)(scratch_bak + 2), 
 			(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 		write_to_gbuf((uint8_t *)(scratch_bak + 3), 
 			(uint8_t *)(CUR_SCRATCH + 3), sizeof(uint16_t));
 		memset(tsrc1, 0, sizeof(fixed) * filter_tile_size);
-		memset(tsrc2, 0, sizeof(fixed) * common_tile_size);
-		memset(tdest1, 0, sizeof(fixed) * common_tile_size);
 		memset(coalesced_filter, 0, sizeof(fixed) * filter_tile_size);
 		transition_to(CUR_TASK);
 	}

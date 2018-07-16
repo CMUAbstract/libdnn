@@ -50,24 +50,27 @@ void task_sm_conv() {
 
 	uint16_t i_stride = CUR_SCRATCH[3] / params.stride[1];
 	uint16_t j_stride = CUR_SCRATCH[4] / params.stride[2];
+	fixed f = MAT_GET(filter, pos);
+	fixed *inter_ptr = MAT_PTR(inter, i_stride, j_stride);
+	fixed *dest_ptr = MAT_PTR(dest, i_stride, j_stride);
 	for(uint16_t i = CUR_SCRATCH[3]; 
 		i < rows * params.stride[1]; i = (CUR_SCRATCH[3] += params.stride[1])){
+		fixed *src_ptr = MAT_PTR(src, k, i + l, CUR_SCRATCH[4] + n);
 		for(uint16_t j = CUR_SCRATCH[4]; 
 			j < cols * params.stride[2]; j = (CUR_SCRATCH[4] += params.stride[2])){
 			fixed w = 0;
 			if(!params.same_padding || (i + l < MAT_GET_DIM(src, 1) && 
 				j + n < MAT_GET_DIM(src, 2))) {
-				w = F_MUL(MAT_GET(filter, pos), 
-					MAT_GET(src, k, i + l, j + n));
+				w = F_MUL(f, *src_ptr);
 			}
 			if(!zero) {
-				w = F_ADD(w, MAT_GET(inter, i_stride, j_stride)); // Zero
+				w = F_ADD(w, *inter_ptr); // Zero
+				inter_ptr++;
 			}
-			MAT_SET(dest, w, i_stride, j_stride);
-			j_stride++;
+			*dest_ptr = w;
+			dest_ptr++;
+			src_ptr += params.stride[2];
 		}
-		j_stride = 0;
-		i_stride++;
 		CUR_SCRATCH[4] = 0;
 	}
 
