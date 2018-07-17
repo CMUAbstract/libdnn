@@ -34,10 +34,12 @@ void task_svm_mul() {
 	}
 
 	uint16_t j = CUR_SCRATCH[1]; // data/col index
+	fixed *inter_ptr = MAT_PTR(inter, CUR_SCRATCH[0], 0);
+	fixed *dest_ptr = MAT_PTR(dest, CUR_SCRATCH[0], 0);
 	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = (++CUR_SCRATCH[0])) {
 		if(j >= (filter->sparse.sizes[i + 1] - filter->sparse.sizes[i])) {
-			if(j == 0) MAT_SET(dest, F_LIT(0), i, 0); // Empty row
-			else MAT_SET(dest, MAT_GET(inter, i, 0), i, 0);
+			if(j == 0) *dest_ptr++ = 0;
+			else *dest_ptr++ = *inter_ptr++;
 			continue;
 		}
 		uint16_t col_idx = filter->sparse.sizes[i] + j;
@@ -45,9 +47,9 @@ void task_svm_mul() {
 		fixed w = MAT_GET(src, filter->sparse.offsets[col_idx], 0);
 		w = F_MUL(f, w);
 		if(j != 0) {
-			w = F_ADD(MAT_GET(inter, i, 0), w); // Add partial
+			w = F_ADD(*inter_ptr++, w); // Add partial
 		}
-		MAT_SET(dest, w, i, 0);
+		*dest_ptr++ = w;
 	}
 
 	scratch_bak[0] = 0;
@@ -58,7 +60,7 @@ void task_svm_mul() {
 	write_to_gbuf((uint8_t *)(scratch_bak + 1), 
 		(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 	uint16_t cols = MAT_GET_DIM(src, 0);
-	if(j < cols - 1) {
+	if(j < cols) {
 		write_to_gbuf((uint8_t *)(scratch_bak + 2), 
 			(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));	
 		transition_to(CUR_TASK);

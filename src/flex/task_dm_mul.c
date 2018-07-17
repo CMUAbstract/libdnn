@@ -39,7 +39,7 @@ void task_dm_mul() {
 		for(uint16_t j = CUR_SCRATCH[1]; j < dcols; j = ++CUR_SCRATCH[1]) {
 			fixed w = F_MUL(MAT_GET(filter, i, k), MAT_GET(src, k, j));
 			if(k > 0) {
-				w = F_ADD(w, MAT_GET(dest, i, j));
+				w = F_ADD(w, MAT_GET(inter, i, j));
 			}
 			MAT_SET(dest, w, i, j);
 		}
@@ -63,7 +63,7 @@ void task_dm_mul() {
 			for(uint16_t j = CUR_SCRATCH[5]; j < dcols; j = ++CUR_SCRATCH[5]) {
 				MAT_SET(inter, MAT_GET(dest, i, j), i, j);
 			}
-			CUR_SCRATCH[1] = 0;
+			CUR_SCRATCH[5] = 0;
 		}
 	}
 	POP_STACK(mat_stack, 3);

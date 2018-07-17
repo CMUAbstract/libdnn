@@ -16,34 +16,43 @@
 #include "cleanup.h"
 
 TASK(TASK_UID_BLAS_OFFSET + 10, task_sm_conv);
-static __fram mat_t buf = {.data = MAT_BUFFER(0)};
-static __fram mat_t *buffer = &buf;
+static __fram mat_t buf1 = {.data = MAT_BUFFER(0)};
+static __fram mat_t buf2 = {.data = MAT_BUFFER(1)};
+static __fram mat_t *buffer1 = &buf1;
+static __fram mat_t *buffer2 = &buf2;
 static __fram fixed coalesced_filter[CONFIG_TILE_SIZE];
 
 // Dense matrix multiplication
 void task_sm_conv() {
-	uint16_t tile_size = check_calibrate();
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+	uint16_t tile_size = 0;
+	uint16_t fcols = filter->sparse.dims[2];
+	if(/*params.stride[1] + params.stride[2] == 2 && fcols != 1*/ 1) {
+		tile_size = check_calibrate();
+	}
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
-	mat_t *inter = buffer;
-	mat_t *filter = PEEK_STACK(mat_stack, 2);
+	mat_t *inter1 = buffer1;
+	mat_t *inter2 = dest;
+	if(params.stride[1] + params.stride[2] != 2 && fcols != 1) {
+		inter2 = buffer2;
+	}
 
 	uint16_t rows = MAT_GET_DIM(dest, 0);
 	uint16_t cols = MAT_GET_DIM(dest, 1);
-	MAT_RESHAPE(inter, rows, cols);
 
 	uint16_t frows = filter->sparse.dims[1];
-	uint16_t fcols = filter->sparse.dims[2];
 	uint16_t total_elements = MAT_GET_DIM(filter, 0);
 
-	mat_t *tmp = dest;
-	if(CUR_SCRATCH[3]) { // Swap buffers
-		dest = inter;
-		inter = tmp;
-	}
 
 	// LEA/DMA don't work well for strided convolution
-	if(params.stride[1] + params.stride[2] != 2 || fcols == 1) {
+	if(/*params.stride[1] + params.stride[2] != 2 || fcols == 1*/ 0) {
+		MAT_RESHAPE(inter1, rows, cols);
+		mat_t *tmp = dest;
+		if(CUR_SCRATCH[3]) { // Swap buffers
+			dest = inter1;
+			inter1 = tmp;
+		}
 		uint16_t pos = CUR_SCRATCH[0];
 		uint16_t idx = CUR_SCRATCH[1];
 		bool zero = false;
@@ -58,7 +67,7 @@ void task_sm_conv() {
 		uint16_t i_stride = CUR_SCRATCH[4] / params.stride[1];
 		uint16_t j_stride = CUR_SCRATCH[5] / params.stride[2];
 		fixed f = MAT_GET(filter, pos);
-		fixed *inter_ptr = MAT_PTR(inter, i_stride, j_stride);
+		fixed *inter1_ptr = MAT_PTR(inter1, i_stride, j_stride);
 		fixed *dest_ptr = MAT_PTR(dest, i_stride, j_stride);
 		for(uint16_t i = CUR_SCRATCH[4]; 
 			i < rows * params.stride[1]; i = (CUR_SCRATCH[4] += params.stride[1])){
@@ -71,8 +80,8 @@ void task_sm_conv() {
 					w = F_MUL(f, (*src_ptr >> SHIFT));
 				}
 				if(!zero) {
-					w = F_ADD(w, *inter_ptr); // Zero
-					inter_ptr++;
+					w = F_ADD(w, *inter1_ptr); // Zero
+					inter1_ptr++;
 				}
 				*dest_ptr = w;
 				dest_ptr++;
@@ -100,7 +109,7 @@ void task_sm_conv() {
 		if(CUR_SCRATCH[3]) {
 			for(uint16_t i = CUR_SCRATCH[6]; i < rows; i = (++CUR_SCRATCH[6])){
 				for(uint16_t j = CUR_SCRATCH[7]; j < cols; j = (++CUR_SCRATCH[7])){
-					MAT_SET(inter, MAT_GET(dest, i, j), i, j);
+					MAT_SET(inter1, MAT_GET(dest, i, j), i, j);
 				}
 				CUR_SCRATCH[7] = 0;
 			}
@@ -109,8 +118,22 @@ void task_sm_conv() {
 		setup_cleanup(CUR_TASK);
 		TRANSITION_TO(task_cleanup);
 	}
+	if(!params.same_padding && inter2 == dest) {
+		rows = MAT_GET_DIM(src, 1);
+		cols = MAT_GET_DIM(src, 2);
+	}
+	rows *= params.stride[1];
+	cols *= params.stride[2];
 
-	if(!params.same_padding) cols = MAT_GET_DIM(src, 2);
+	// PRINTF("\r\n rows: %u cols: %u", rows, cols);
+	MAT_RESHAPE(inter1, rows, cols);
+	if(inter2 != dest) MAT_RESHAPE(inter2, rows, cols);
+
+	mat_t *tmp = inter2;
+	if(CUR_SCRATCH[3]) { // Swap buffers
+		inter2 = inter1;
+		inter1 = tmp;
+	}
 	uint16_t pos = CUR_SCRATCH[0];
 	uint16_t idx = CUR_SCRATCH[1];
 
@@ -175,7 +198,7 @@ void task_sm_conv() {
 			params_fir.length += params_fir.length & 0x01;
 			params_add.length = params_fir.length;
 			for(uint16_t g = 0; g < row_step; g++) {
-				if(common_tile_size > 12 DMA_ENABLE) { // Load activation tile
+				if(common_cols > 12 DMA_ENABLE) { // Load activation tile
 					DMA_setTransferSize(dma_config.channelSelect, 
 						common_cols);
 				    DMA_setSrcAddress(dma_config.channelSelect, 
@@ -195,22 +218,22 @@ void task_sm_conv() {
 			status = msp_fir_q15(&params_fir, tsrc2, tdest1);
 			msp_checkStatus(status);
 			// PRINTF("\r\n i: %u j: %u k: %u l: %u n: %u tsrc1: %i tsrc2: %i tdest1: %i inter: %i row_step: %u  common_cols: %u, common_tile_size: %u",
-				// i, j, k, l, n, tsrc1[0], tsrc2[0], tdest1[0], MAT_GET(inter, 0, 0), row_step, common_cols, common_tile_size);
+			// 	i, j, k, l, n, tsrc1[0], tsrc2[0], tdest1[0], MAT_GET(inter1, 0, 0), row_step, common_cols, common_tile_size);
 			if(k == 0 && l == 0 && n == 0) { // Zero
 				for(uint16_t g = 0; g < row_step; g++) {
-					if(common_tile_size > 12 DMA_ENABLE) {
+					if(common_cols > 12 DMA_ENABLE) {
 						DMA_setTransferSize(dma_config.channelSelect, 
 							common_cols);
 					    DMA_setSrcAddress(dma_config.channelSelect, 
 							(uint32_t) (tdest1 + g * (cols + filter_length)), 
 							DMA_DIRECTION_INCREMENT);
 					    DMA_setDstAddress(dma_config.channelSelect, 
-					    	(uint32_t) (MAT_PTR(dest, i + g, j)), 
+					    	(uint32_t) (MAT_PTR(inter2, i + g, j)), 
 					    	DMA_DIRECTION_INCREMENT);
 						DMA_enableTransfers(dma_config.channelSelect);
 					    DMA_startSleepTransfer(dma_config.channelSelect);
 					} else {
-						memcpy(MAT_PTR(dest, i + g, j), 
+						memcpy(MAT_PTR(inter2, i + g, j), 
 							tdest1 + g * (cols + filter_length), 
 							sizeof(fixed) * common_cols);	
 					}
@@ -218,11 +241,11 @@ void task_sm_conv() {
 				continue;
 			}
 			for(uint16_t g = 0; g < row_step; g++) {
-				if(common_tile_size > 12 DMA_ENABLE) { // intermediate
+				if(common_cols > 12 DMA_ENABLE) { // inter1mediate
 					DMA_setTransferSize(dma_config.channelSelect, 
 						common_cols);
 				    DMA_setSrcAddress(dma_config.channelSelect, 
-						(uint32_t) MAT_PTR(inter, i + g, j), 
+						(uint32_t) MAT_PTR(inter1, i + g, j), 
 						DMA_DIRECTION_INCREMENT);
 				    DMA_setDstAddress(dma_config.channelSelect, 
 				    	(uint32_t) (tsrc2 + g * (cols + filter_length)), 
@@ -231,33 +254,33 @@ void task_sm_conv() {
 				    DMA_startSleepTransfer(dma_config.channelSelect);
 				} else {
 					memcpy(tsrc2 + g * (cols + filter_length), 
-						MAT_PTR(inter, i + g, j), 
+						MAT_PTR(inter1, i + g, j), 
 						sizeof(fixed) * common_cols);	
 				}
 			}
 			status = msp_add_q15(&params_add, tdest1, tsrc2, tdest2);
 			msp_checkStatus(status);
 			for(uint16_t g = 0; g < row_step; g++) {
-				if(common_tile_size > 12 DMA_ENABLE) {
+				if(common_cols > 12 DMA_ENABLE) {
 					DMA_setTransferSize(dma_config.channelSelect, common_cols);
 				    DMA_setSrcAddress(dma_config.channelSelect, 
 						(uint32_t) (tdest2 + g * (cols + filter_length)), 
 						DMA_DIRECTION_INCREMENT);
 				    DMA_setDstAddress(dma_config.channelSelect, 
-				    	(uint32_t) (MAT_PTR(dest, i + g, j)), 
+				    	(uint32_t) (MAT_PTR(inter2, i + g, j)), 
 				    	DMA_DIRECTION_INCREMENT);
 					DMA_enableTransfers(dma_config.channelSelect);
 				    DMA_startSleepTransfer(dma_config.channelSelect);
 				} else {
-					memcpy(MAT_PTR(dest, i + g, j), 
+					memcpy(MAT_PTR(inter2, i + g, j), 
 						tdest2 + g * (cols + filter_length), 
 						sizeof(fixed) * common_cols);
-					// PRINTF("\r\n %i dest: %i inter: %i", 
-					// 	tdest2[0], MAT_GET(dest, 0, 0), MAT_GET(inter, 0, 0));
 				}
 			}
 		}
-		if(i + common_rows >= rows) row_step = rows - i;
+		if(i + common_rows >= rows) {
+			row_step = rows - i;
+		}
 		CUR_SCRATCH[5] = 0;
 	}
 	scratch_bak[3] = CUR_SCRATCH[3] ^ 0x01;
@@ -282,9 +305,25 @@ void task_sm_conv() {
 	if(CUR_SCRATCH[3]) {
 		for(uint16_t i = CUR_SCRATCH[6]; i < rows; i = (++CUR_SCRATCH[6])){
 			for(uint16_t j = CUR_SCRATCH[7]; j < cols; j = (++CUR_SCRATCH[7])){
-				MAT_SET(inter, MAT_GET(dest, i, j), i, j);
+				MAT_SET(inter1, MAT_GET(inter2, i, j), i, j);
 			}
 			CUR_SCRATCH[7] = 0;
+		}
+	}
+
+	if(inter2 != dest) {
+		uint16_t i_stride = CUR_SCRATCH[8] / params.stride[1];
+		uint16_t j_stride = CUR_SCRATCH[9] / params.stride[2];
+		for(uint16_t i = CUR_SCRATCH[8]; i < rows; 
+			i = (CUR_SCRATCH[8] += params.stride[1])){
+			for(uint16_t j = CUR_SCRATCH[9]; j < cols; 
+				j = (CUR_SCRATCH[9] += params.stride[2])){
+				MAT_SET(dest, MAT_GET(inter2, i, j), i_stride, j_stride);
+				j_stride++;
+			}
+			i_stride++;
+			j_stride = 0;
+			CUR_SCRATCH[9] = 0;
 		}
 	}
 
