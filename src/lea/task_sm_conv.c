@@ -27,28 +27,27 @@ static __fram fixed coalesced_filter[CONFIG_TILE_SIZE];
 // Dense matrix multiplication
 void task_sm_conv() {
 	mat_t *filter = PEEK_STACK(mat_stack, 2);
-	uint16_t tile_size = 0;
-	uint16_t fcols = filter->sparse.dims[2];
-	if(/*params.stride[1] + params.stride[2] == 2 && fcols != 1*/ 1) {
-		tile_size = check_calibrate();
-	}
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *inter1 = buffer1;
 	mat_t *inter2 = dest;
-	if(params.stride[1] + params.stride[2] != 2 && fcols != 1) {
+	uint16_t tile_size = 0;
+	uint16_t flayers = filter->sparse.dims[0];
+	uint16_t frows = filter->sparse.dims[1];
+	uint16_t fcols = filter->sparse.dims[2];
+	uint16_t rows = MAT_GET_DIM(dest, 0);
+	uint16_t cols = MAT_GET_DIM(dest, 1);
+	uint16_t total_elements = MAT_GET_DIM(filter, 0);
+	bool run_sonic = ((frows > 10 && fcols == 1) || 
+		(flayers > 10 && fcols == 1)); // Change which condition here
+	if(!run_sonic) {
+		tile_size = check_calibrate();
+	}
+	if(params.stride[1] + params.stride[2] != 2 && !run_sonic) {
 		inter2 = buffer2;
 	}
 
-	uint16_t rows = MAT_GET_DIM(dest, 0);
-	uint16_t cols = MAT_GET_DIM(dest, 1);
-
-	uint16_t frows = filter->sparse.dims[1];
-	uint16_t total_elements = MAT_GET_DIM(filter, 0);
-
-
-	// LEA/DMA don't work well for strided convolution
-	if(/*params.stride[1] + params.stride[2] != 2 || fcols == 1*/ 0) {
+	if(run_sonic) {
 		MAT_RESHAPE(inter1, rows, cols);
 		mat_t *tmp = dest;
 		if(CUR_SCRATCH[3]) { // Swap buffers
@@ -312,7 +311,6 @@ void task_sm_conv() {
 			CUR_SCRATCH[7] = 0;
 		}
 	}
-
 	if(inter2 != dest) {
 		uint16_t i_stride = CUR_SCRATCH[8] / params.stride[1];
 		uint16_t j_stride = CUR_SCRATCH[9] / params.stride[2];
