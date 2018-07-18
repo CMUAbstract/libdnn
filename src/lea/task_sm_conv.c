@@ -15,6 +15,8 @@
 #include "profile.h"
 #include "cleanup.h"
 
+#include "debug.h"
+
 TASK(TASK_UID_BLAS_OFFSET + 10, task_sm_conv);
 static __fram mat_t buf1 = {.data = MAT_BUFFER(0)};
 static __fram mat_t buf2 = {.data = MAT_BUFFER(1)};

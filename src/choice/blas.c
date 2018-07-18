@@ -58,11 +58,11 @@ TASK(TASK_UID_BLAS_OFFSET + 14, task_dm_mul_lea);
 TASK(TASK_UID_BLAS_OFFSET + 15, task_sm_conv_flex);
 TASK(TASK_UID_BLAS_OFFSET + 16, task_sm_conv_lea);
 
-void pulse(uint16_t pin) {
-	P6DIR = 0x03;
-	P6OUT = pin;
-	__delay_cycles(0x100);
-	P6OUT = 0x00;
+void pulse(uint16_t length) {
+	P8DIR = 0x02;
+	P8OUT = 0x02;
+	__delay_cycles(0x400 + length);
+	P8OUT = 0x00;
 }
 
 // Shut off CPU and do a DMA transfer
@@ -158,13 +158,16 @@ void task_calibrate() {
 		status = msp_mac_q15(&params, tsrc1, tsrc2, tdest);
 		PRINTF("\r\n Done init: status: %u tile_size %u", status, CUR_SCRATCH[1]);
 		msp_checkStatus(status);
-		write_to_gbuf((uint8_t *)(CUR_SCRATCH + 1), (uint8_t *)(&tile_size), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(CUR_SCRATCH + 1), 
+			(uint8_t *)(&tile_size), sizeof(uint16_t));
 		transition_to(CUR_TASK);
 	} else if(CUR_SCRATCH[0] == 2 && tile_size == 0) {
 		scratch_bak[0] = 3;
 		scratch_bak[1] = CUR_SCRATCH[1] / 2;
-		write_to_gbuf((uint8_t *)(scratch_bak), (uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
-		write_to_gbuf((uint8_t *)(scratch_bak + 1), (uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak), 
+			(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));
+		write_to_gbuf((uint8_t *)(scratch_bak + 1), 
+			(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		transition_to(CUR_TASK);	
 	}
 	last_task = CUR_TASK;

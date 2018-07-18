@@ -12,6 +12,8 @@
 #include "misc.h"
 #include "cleanup.h"
 
+#include "debug.h"
+
 void task_calibrate();
 TASK(TASK_UID_BLAS_OFFSET + 12, task_calibrate);
 
@@ -28,7 +30,7 @@ __fram fixed tdest2[CONFIG_TILE_SIZE];
 #endif
 
 __fram DMA_initParam dma_config;
-static __fram bool DMA_initialized = false;
+static bool DMA_initialized = false;
 static __fram uint16_t tile_size = 0;
 
 uint16_t check_calibrate(void){
