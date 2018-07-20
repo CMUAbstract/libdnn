@@ -1,6 +1,8 @@
 #include "profile.h"
 
+#include <msp430.h>
 #include <string.h>
+#include <libmspbuiltins/builtins.h>
 #include <libio/console.h>
 #include <libfixed/fixed.h>
 
@@ -21,7 +23,6 @@ static __fram stat stats[0x10];
 static __fram uint16_t stat_len = 0;
 
 void prof_inc(char *name, uint16_t invoc, uint16_t ops) {
-	ld_invoc += v;
 	for(uint16_t i = 0; i < stat_len; i++) {
 		if(strcmp(name, stats[i].name) == 0) {
 			stats[stat_len].invoc += invoc;
@@ -45,6 +46,15 @@ void prof_print() {
 	}
 	PRINTF("\r\n ]");
 	PRINTF("\r\n=======================");
+}
+
+void prof_pulse(uint16_t length) {
+	P8DIR = 0x02;
+	P8OUT = 0x02;
+	for(uint16_t i = 0; i < length; i++) {
+		__delay_cycles(0x10);
+	}
+	P8OUT = 0x00;
 }
 
 #endif

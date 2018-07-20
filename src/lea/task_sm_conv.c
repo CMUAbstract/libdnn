@@ -15,8 +15,6 @@
 #include "profile.h"
 #include "cleanup.h"
 
-#include "debug.h"
-
 TASK(TASK_UID_BLAS_OFFSET + 10, task_sm_conv);
 static __fram mat_t buf1 = {.data = MAT_BUFFER(0)};
 static __fram mat_t buf2 = {.data = MAT_BUFFER(1)};
@@ -30,7 +28,7 @@ void task_sm_conv() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
 	mat_t *inter1 = buffer1;
-	mat_t *inter2 = dest;
+	mat_t *inter2 = buffer2;
 	uint16_t tile_size = 0;
 	uint16_t flayers = filter->sparse.dims[0];
 	uint16_t frows = filter->sparse.dims[1];
@@ -38,13 +36,9 @@ void task_sm_conv() {
 	uint16_t rows = MAT_GET_DIM(dest, 0);
 	uint16_t cols = MAT_GET_DIM(dest, 1);
 	uint16_t total_elements = MAT_GET_DIM(filter, 0);
-	bool run_sonic = ((frows > 10 && fcols == 1) || 
-		(flayers > 10 && fcols == 1)); // Change which condition here
+	bool run_sonic = false; // Run Sonic?
 	if(!run_sonic) {
 		tile_size = check_calibrate();
-	}
-	if(params.stride[1] + params.stride[2] != 2 && !run_sonic) {
-		inter2 = buffer2;
 	}
 
 	if(run_sonic) {
@@ -119,7 +113,7 @@ void task_sm_conv() {
 		setup_cleanup(CUR_TASK);
 		TRANSITION_TO(task_cleanup);
 	}
-	if(!params.same_padding && inter2 == dest) {
+	if(!params.same_padding) {
 		rows = MAT_GET_DIM(src, 1);
 		cols = MAT_GET_DIM(src, 2);
 	}
@@ -128,7 +122,7 @@ void task_sm_conv() {
 
 	// PRINTF("\r\n rows: %u cols: %u", rows, cols);
 	MAT_RESHAPE(inter1, rows, cols);
-	if(inter2 != dest) MAT_RESHAPE(inter2, rows, cols);
+	MAT_RESHAPE(inter2, rows, cols);
 
 	mat_t *tmp = inter2;
 	if(CUR_SCRATCH[3]) { // Swap buffers
@@ -150,7 +144,7 @@ void task_sm_conv() {
 	if(common_rows == 0) common_rows = 1;
 	else if(common_rows > rows) common_rows = rows;
 	uint16_t common_cols = common_tile_size; 
-	common_tile_size *= common_rows; 
+	common_tile_size *= common_rows;
 
 	// Create filter
 	if(!CUR_SCRATCH[2]) {
@@ -183,8 +177,8 @@ void task_sm_conv() {
 			tsrc1[filter_length - i - 1] = 0;
 			continue;
 		}
-		// tsrc1[filter_length - i - 1] = coalesced_filter[i] << (SHIFT + 1);
-		tsrc1[filter_length - i - 1] = coalesced_filter[i] << SHIFT;
+		tsrc1[filter_length - i - 1] = coalesced_filter[i] << (SHIFT + 1);
+		// tsrc1[filter_length - i - 1] = coalesced_filter[i] << SHIFT;
 	}
 	// PRINTF("\r\nFilter ");
 	// for(uint16_t i = 0; i < filter_length; i++) {
@@ -311,20 +305,18 @@ void task_sm_conv() {
 			CUR_SCRATCH[7] = 0;
 		}
 	}
-	if(inter2 != dest) {
-		uint16_t i_stride = CUR_SCRATCH[8] / params.stride[1];
-		uint16_t j_stride = CUR_SCRATCH[9] / params.stride[2];
-		for(uint16_t i = CUR_SCRATCH[8]; i < rows; 
-			i = (CUR_SCRATCH[8] += params.stride[1])){
-			for(uint16_t j = CUR_SCRATCH[9]; j < cols; 
-				j = (CUR_SCRATCH[9] += params.stride[2])){
-				MAT_SET(dest, MAT_GET(inter2, i, j), i_stride, j_stride);
-				j_stride++;
-			}
-			i_stride++;
-			j_stride = 0;
-			CUR_SCRATCH[9] = 0;
+	uint16_t i_stride = CUR_SCRATCH[8] / params.stride[1];
+	uint16_t j_stride = CUR_SCRATCH[9] / params.stride[2];
+	for(uint16_t i = CUR_SCRATCH[8]; i < rows; 
+		i = (CUR_SCRATCH[8] += params.stride[1])){
+		for(uint16_t j = CUR_SCRATCH[9]; j < cols; 
+			j = (CUR_SCRATCH[9] += params.stride[2])){
+			MAT_SET(dest, MAT_GET(inter2, i, j), i_stride, j_stride);
+			j_stride++;
 		}
+		i_stride++;
+		j_stride = 0;
+		CUR_SCRATCH[9] = 0;
 	}
 
 	POP_STACK(mat_stack, 3);

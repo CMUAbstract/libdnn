@@ -53,6 +53,7 @@ void task_sm_conv() {
 	fixed f = MAT_GET(filter, pos);
 	fixed *inter_ptr = MAT_PTR(inter, i_stride, j_stride);
 	fixed *dest_ptr = MAT_PTR(dest, i_stride, j_stride);
+	prof_pulse(1);
 	for(uint16_t i = CUR_SCRATCH[3]; 
 		i < rows * params.stride[1]; i = (CUR_SCRATCH[3] += params.stride[1])){
 		fixed *src_ptr = MAT_PTR(src, k, i + l, CUR_SCRATCH[4] + n);
@@ -73,6 +74,7 @@ void task_sm_conv() {
 		}
 		CUR_SCRATCH[4] = 0;
 	}
+	prof_pulse(1);
 
 	scratch_bak[0] = pos + 1;
 	scratch_bak[1] = idx + filter->sparse.offsets[pos + 1];

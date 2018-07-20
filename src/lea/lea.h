@@ -7,6 +7,7 @@
 
 extern fixed tsrc1[CONFIG_TILE_SIZE];
 extern fixed tsrc2[CONFIG_TILE_SIZE];
+extern fixed tsrc3[CONFIG_TILE_SIZE];
 extern fixed tdest1[CONFIG_TILE_SIZE];
 extern fixed tdest2[CONFIG_TILE_SIZE];
 

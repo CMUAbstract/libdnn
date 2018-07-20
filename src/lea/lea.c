@@ -12,19 +12,19 @@
 #include "misc.h"
 #include "cleanup.h"
 
-#include "debug.h"
-
 void task_calibrate();
 TASK(TASK_UID_BLAS_OFFSET + 12, task_calibrate);
 
 #ifndef MSP_DISABLE_LEA
 DSPLIB_DATA(tsrc1, 2) fixed tsrc1[CONFIG_TILE_SIZE];
 DSPLIB_DATA(tsrc2, 2) fixed tsrc2[CONFIG_TILE_SIZE];
+DSPLIB_DATA(tsrc3, 2) fixed tsrc3[CONFIG_TILE_SIZE];
 DSPLIB_DATA(tdest1, 2) fixed tdest1[CONFIG_TILE_SIZE];
 DSPLIB_DATA(tdest2, 2) fixed tdest2[CONFIG_TILE_SIZE];
 #else
 __fram fixed tsrc1[CONFIG_TILE_SIZE];
 __fram fixed tsrc2[CONFIG_TILE_SIZE];
+__fram fixed tsrc3[CONFIG_TILE_SIZE];
 __fram fixed tdest1[CONFIG_TILE_SIZE];
 __fram fixed tdest2[CONFIG_TILE_SIZE];
 #endif
