@@ -193,7 +193,7 @@ void task_sm_conv() {
 			tsrc1[filter_length - i - 1] = 0;
 			continue;
 		}
-		if(cols == 1) {
+		if(dcols == 1) {
 			tsrc1[filter_length - i - 1] = coalesced_filter[i];
 			continue;
 		}
