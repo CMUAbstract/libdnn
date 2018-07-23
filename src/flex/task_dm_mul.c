@@ -36,10 +36,16 @@ void task_dm_mul() {
 
 	uint16_t k = CUR_SCRATCH[2];
 	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = ++CUR_SCRATCH[0]) {
+		prof_inc("loop_inc", 1, 1);
 		for(uint16_t j = CUR_SCRATCH[1]; j < dcols; j = ++CUR_SCRATCH[1]) {
+			prof_inc("loop_inc", 1, 1);
 			fixed w = F_MUL(MAT_GET(filter, i, k), MAT_GET(src, k, j));
+			prof_inc("F_MUL", 1, 1);
+			prof_inc("MAT_GET_2D", 2, 2);
+			prof_inc("MAT_SET_2D", 1, 1);
 			if(k > 0) {
 				w = F_ADD(w, MAT_GET(inter, i, j));
+				prof_inc("F_ADD", 1, 1);
 			}
 			MAT_SET(dest, w, i, j);
 		}

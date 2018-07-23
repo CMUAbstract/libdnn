@@ -25,8 +25,8 @@ static __fram uint16_t stat_len = 0;
 void prof_inc(char *name, uint16_t invoc, uint16_t ops) {
 	for(uint16_t i = 0; i < stat_len; i++) {
 		if(strcmp(name, stats[i].name) == 0) {
-			stats[stat_len].invoc += invoc;
-			stats[stat_len].ops += ops;
+			stats[i].invoc += invoc;
+			stats[i].ops += ops;
 			return;
 		}
 	}

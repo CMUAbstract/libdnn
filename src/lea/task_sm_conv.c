@@ -197,8 +197,8 @@ void task_sm_conv() {
 			tsrc1[filter_length - i - 1] = coalesced_filter[i];
 			continue;
 		}
-		// tsrc1[filter_length - i - 1] = coalesced_filter[i] << (SHIFT + 1);
-		tsrc1[filter_length - i - 1] = coalesced_filter[i] << SHIFT;
+		tsrc1[filter_length - i - 1] = coalesced_filter[i] << (SHIFT + 1);
+		// tsrc1[filter_length - i - 1] = coalesced_filter[i] << SHIFT;
 	}
 	// PRINTF("\r\nFilter ");
 	// for(uint16_t i = 0; i < filter_length; i++) {

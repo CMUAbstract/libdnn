@@ -20,8 +20,11 @@ void task_ds_zero() {
 	uint16_t rows = MAT_GET_DIM(src, 0);
 	uint16_t cols = MAT_GET_DIM(src, 1);
 	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = ++CUR_SCRATCH[0]) {
+		prof_inc("loop_inc", 1, 1);	
 		for(uint16_t j = CUR_SCRATCH[1]; j < cols; j = ++CUR_SCRATCH[1]) {
+			prof_inc("loop_inc", 1, 1);
 			MAT_SET(dest, 0, i, j);
+			prof_inc("MAT_SET_2D", 1, 1);	
 		}
 		CUR_SCRATCH[1] = 0;
 	}

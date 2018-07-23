@@ -11,6 +11,7 @@
 #include "state.h"
 #include "misc.h"
 #include "cleanup.h"
+#include "profile.h"
 
 // Public tasks
 TASK(TASK_UID_NONLINEAR_OFFSET + 1, task_pool);
@@ -24,18 +25,29 @@ void task_pool() {
 	uint16_t layers = MAT_GET_DIM(src, 0);
 	uint16_t rows = MAT_GET_DIM(src, 1);
 	for(uint16_t i = CUR_SCRATCH[0]; i < layers; i = ++CUR_SCRATCH[0]) {
+		prof_inc("loop_inc", 1, 1);
 		for(uint16_t j = CUR_SCRATCH[1]; j < rows;
 			j = (CUR_SCRATCH[1] += params.stride[1])) {
+			prof_inc("loop_inc", 1, 1);
 			for(uint16_t k = CUR_SCRATCH[2]; k < rows; 
 				k = (CUR_SCRATCH[2] += params.stride[2])) {
+				prof_inc("ld", 1, 1);
+				prof_inc("loop_inc", 1, 1);
 				fixed max = MAT_GET(src, i, j, k);
-				for(uint16_t l = 0; l < params.size[1]; l ++) {
-					for(uint16_t m = 0; m < params.size[2]; m ++) {
+				for(uint16_t l = 0; l < params.size[1]; l++) {
+					prof_inc("inc", 1, 1);
+					prof_inc("ld", 1, 1);
+					for(uint16_t m = 0; m < params.size[2]; m++) {
+						prof_inc("inc", 1, 1);
+						prof_inc("MAT_GET_3D", 1, 1);
+						prof_inc("add", 2, 2);
 						fixed val = MAT_GET(src, i, j + l, k + m);
 						if(F_LT(max, val))
 							max = val;
 					}
 				}
+				prof_inc("MAT_SET_3D", 1, 1);
+				prof_inc("mul", 2, 2);
 				MAT_SET(dest, max, i, j / params.stride[1], k / params.stride[2]);
 			}
 			CUR_SCRATCH[2] = 0;
@@ -78,7 +90,11 @@ void task_relu() {
 	}
 	fixed max = F_LIT(0.0);
 	for(uint16_t i = CUR_SCRATCH[0]; i < total_elements; i = ++CUR_SCRATCH[0]) {
+		prof_inc("loop_inc", 1, 1);
 		max = *(src->data + i);
+		prof_inc("add", 2, 2);
+		prof_inc("ld", 1, 1);
+		prof_inc("st", 1, 1);
 		*(dest->data + i) = (F_LT(max, F_LIT(0.0))) ? F_LIT(0.0) : max;
 	}
 	POP_STACK(mat_stack, 2);

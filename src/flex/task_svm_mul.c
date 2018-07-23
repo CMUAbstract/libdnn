@@ -37,18 +37,42 @@ void task_svm_mul() {
 	fixed *inter_ptr = MAT_PTR(inter, CUR_SCRATCH[0], 0);
 	fixed *dest_ptr = MAT_PTR(dest, CUR_SCRATCH[0], 0);
 	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = (++CUR_SCRATCH[0])) {
+		prof_inc("loop_inc", 1, 1);
+		prof_inc("ld", 2, 2);
+		prof_inc("inc", 1, 1);
+		prof_inc("add", 1, 1);
 		if(j >= (filter->sparse.sizes[i + 1] - filter->sparse.sizes[i])) {
-			if(j == 0) *dest_ptr++ = 0;
-			else *dest_ptr++ = *inter_ptr++;
+			if(j == 0) {
+				*dest_ptr++ = 0;
+				prof_inc("inc", 1, 1);
+				prof_inc("st", 1, 1);
+			} else {
+				*dest_ptr++ = *inter_ptr++;
+				prof_inc("inc", 2, 2);
+				prof_inc("st", 2, 2);
+				prof_inc("ld", 1, 1);
+			}
 			continue;
 		}
+		prof_inc("add", 1, 1);
 		uint16_t col_idx = filter->sparse.sizes[i] + j;
+		prof_inc("MAT_GET_1D", 1, 1);
 		fixed f = MAT_GET(filter, col_idx);
+		prof_inc("MAT_GET_1D", 1, 1);
+		prof_inc("ld", 1, 1);
 		fixed w = MAT_GET(src, filter->sparse.offsets[col_idx], 0);
+		prof_inc("F_MUL", 1, 1);
 		w = F_MUL(f, w);
 		if(j != 0) {
+			prof_inc("F_ADD", 1, 1);
+			prof_inc("ld", 1, 1);
+			prof_inc("st", 1, 1);
+			prof_inc("inc", 1, 1);
 			w = F_ADD(*inter_ptr++, w); // Add partial
 		}
+		prof_inc("ld", 1, 1);
+		prof_inc("st", 1, 1);
+		prof_inc("inc", 1, 1);
 		*dest_ptr++ = w;
 	}
 

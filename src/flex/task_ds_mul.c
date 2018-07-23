@@ -21,9 +21,14 @@ void task_ds_mul() {
 	uint16_t rows = MAT_GET_DIM(src, 0);
 	uint16_t cols = MAT_GET_DIM(src, 1);
 	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = ++CUR_SCRATCH[0]) {
+		prof_inc("loop_inc", 1, 1);
 		for(uint16_t j = CUR_SCRATCH[1]; j < cols; j = ++CUR_SCRATCH[1]) {
+			prof_inc("loop_inc", 1, 1);
 			fixed w = F_MUL(MAT_GET(src, i, j), MAT_GET(filter, 0));
 			MAT_SET(dest, w, i, j);
+			prof_inc("F_MUL", 1, 1);
+			prof_inc("MAT_GET_2D", 2, 2);
+			prof_inc("MAT_SET_2D", 1, 1);
 		}
 		CUR_SCRATCH[1] = 0;
 	}
