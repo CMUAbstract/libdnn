@@ -10,6 +10,7 @@
 
 typedef struct {
 	bool same_padding;
+	bool transpose;
 	uint16_t stride[3];
 	uint16_t size[3];
 } param_t;

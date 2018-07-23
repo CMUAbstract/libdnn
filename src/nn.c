@@ -228,6 +228,9 @@ void task_d_depthconv() {
 	TRANSITION_TO(task_cleanup);
 }
 
+static __fram bool transpose = false;
+static __fram mat_t src_bak;
+static __fram mat_t *src_bak_ptr = &src_bak;
 void task_s_conv() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
@@ -235,6 +238,7 @@ void task_s_conv() {
 	mat_t *b = PEEK_STACK(mat_stack, 3);
 	mat_reshape(inter, dest->dims, dest->len_dims);
 	uint16_t filters = w->sparse.dims[0];
+	transpose = (w->sparse.dims[2] > 1 && w->sparse.dims[3] == 1);
 	if(CUR_SCRATCH[0] == 0) { // Sparse Convolve
 		PRINTF("\r\n Shifting src");
 		mat_reshape(inter, src->dims, src->len_dims);
@@ -244,7 +248,11 @@ void task_s_conv() {
 				i < MAT_GET_DIM(src, 1); i = ++CUR_SCRATCH[3]) {
 				for(uint16_t j = CUR_SCRATCH[4]; 
 					j < MAT_GET_DIM(src, 2); j = ++CUR_SCRATCH[4]) {
-					MAT_SET(inter, (MAT_GET(src, k, i, j) << SHIFT), k, i, j);
+					if(MAT_GET_DIM(src, 1) == 1) {
+						MAT_SET(inter, MAT_GET(src, k, i, j), k, i, j);
+					} else {
+						MAT_SET(inter, (MAT_GET(src, k, i, j) << SHIFT), k, i, j);
+					}
 				}
 				CUR_SCRATCH[4] = 0;
 			}
@@ -255,18 +263,27 @@ void task_s_conv() {
 		write_to_gbuf((uint8_t *)(scratch_bak), 
 			(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));	
 		write_to_gbuf((uint8_t *)(scratch_bak + 2), 
-			(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));	
+			(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
 		transition_to(CUR_TASK);	
 	} else if(CUR_SCRATCH[0] == 1) { // Sparse Convolve
 		PRINTF("\r\n Writing back");
 		mat_reshape(inter, src->dims, src->len_dims);
+		if(transpose) {
+			mat_copy(src, src_bak_ptr);
+			MAT_RESHAPE(src_bak_ptr, MAT_GET_DIM(src, 0), 
+				MAT_GET_DIM(src, 2), MAT_GET_DIM(src, 1));
+		}
 		for(uint16_t k = CUR_SCRATCH[2]; 
 			k < MAT_GET_DIM(src, 0); k = ++CUR_SCRATCH[2]) {
 			for(uint16_t i = CUR_SCRATCH[3]; 
 				i < MAT_GET_DIM(src, 1); i = ++CUR_SCRATCH[3]) {
 				for(uint16_t j = CUR_SCRATCH[4]; 
 					j < MAT_GET_DIM(src, 2); j = ++CUR_SCRATCH[4]) {
-					MAT_SET(src, MAT_GET(inter, k, i, j), k, i, j);
+					if(transpose) {
+						MAT_SET(src_bak_ptr, MAT_GET(inter, k, i, j), k, j, i);
+					} else {
+						MAT_SET(src, MAT_GET(inter, k, i, j), k, i, j);
+					}
 				}
 				CUR_SCRATCH[4] = 0;
 			}
@@ -274,6 +291,11 @@ void task_s_conv() {
 		}
 		scratch_bak[0] = 2;
 		scratch_bak[2] = 0;
+		if(transpose) {
+			PRINTF("\r\n Taking transpose");
+			write_to_gbuf((uint8_t *)(src_bak_ptr), 
+				(uint8_t *)(src), sizeof(mat_t));
+		}
 		write_to_gbuf((uint8_t *)(scratch_bak), 
 			(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));	
 		write_to_gbuf((uint8_t *)(scratch_bak + 2), 
@@ -282,6 +304,7 @@ void task_s_conv() {
 	} else if(CUR_SCRATCH[0] == 2) {
 		uint16_t i = CUR_SCRATCH[1];
 		uint16_t running_size = CUR_SCRATCH[2];
+		params.transpose = transpose;
 		if(i < filters) {
 			if(w->sparse.sizes[i] > 0) {
 				PRINTF("\r\n     Convolving %u %u %u", 
@@ -321,6 +344,7 @@ void task_s_conv() {
 		transition_to(CUR_TASK);
 	}
 	if(b == NULL) {
+		params.transpose = false;
 		POP_STACK(mat_stack, 4);
 		setup_cleanup(CUR_TASK);
 		TRANSITION_TO(task_cleanup);
@@ -340,6 +364,7 @@ void task_s_conv() {
 			(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		TRANSITION_TO(task_ds_add);
 	}
+	params.transpose = false;
 	POP_STACK(mat_stack, 4);
 	setup_cleanup(CUR_TASK);
 	TRANSITION_TO(task_cleanup);
@@ -352,8 +377,9 @@ void task_s_depthconv() {
 	mat_t *b = PEEK_STACK(mat_stack, 3);
 	mat_reshape(inter, dest->dims, dest->len_dims);
 	uint16_t filters = w->sparse.dims[0];
+	transpose = (w->sparse.dims[2] > 1 && w->sparse.dims[3] == 1);
 	if(CUR_SCRATCH[0] == 0) { // Sparse Convolve
-		PRINTF("\r\n Shifting src");
+		PRINTF("\r\n Shifting src %u %u %u", filters, w->sparse.dims[1], w->sparse.dims[2]);
 		mat_reshape(inter, src->dims, src->len_dims);
 		for(uint16_t k = CUR_SCRATCH[2]; 
 			k < MAT_GET_DIM(src, 0); k = ++CUR_SCRATCH[2]) {
@@ -377,13 +403,22 @@ void task_s_depthconv() {
 	} else if(CUR_SCRATCH[0] == 1) { // Sparse Convolve
 		PRINTF("\r\n Writing back");
 		mat_reshape(inter, src->dims, src->len_dims);
+		if(transpose) {
+			mat_copy(src, src_bak_ptr);
+			MAT_RESHAPE(src_bak_ptr, MAT_GET_DIM(src, 0), 
+				MAT_GET_DIM(src, 2), MAT_GET_DIM(src, 1));
+		}
 		for(uint16_t k = CUR_SCRATCH[2]; 
 			k < MAT_GET_DIM(src, 0); k = ++CUR_SCRATCH[2]) {
 			for(uint16_t i = CUR_SCRATCH[3]; 
 				i < MAT_GET_DIM(src, 1); i = ++CUR_SCRATCH[3]) {
 				for(uint16_t j = CUR_SCRATCH[4]; 
 					j < MAT_GET_DIM(src, 2); j = ++CUR_SCRATCH[4]) {
-					MAT_SET(src, MAT_GET(inter, k, i, j), k, i, j);
+					if(transpose) {
+						MAT_SET(src_bak_ptr, MAT_GET(inter, k, i, j), k, j, i);
+					} else {
+						MAT_SET(src, MAT_GET(inter, k, i, j), k, i, j);
+					}
 				}
 				CUR_SCRATCH[4] = 0;
 			}
@@ -391,6 +426,11 @@ void task_s_depthconv() {
 		}
 		scratch_bak[0] = 2;
 		scratch_bak[2] = 0;
+		if(transpose) {
+			PRINTF("\r\n Taking transpose");
+			write_to_gbuf((uint8_t *)(src_bak_ptr), 
+				(uint8_t *)(src), sizeof(mat_t));
+		}
 		write_to_gbuf((uint8_t *)(scratch_bak), 
 			(uint8_t *)(CUR_SCRATCH), sizeof(uint16_t));	
 		write_to_gbuf((uint8_t *)(scratch_bak + 2), 
@@ -399,6 +439,7 @@ void task_s_depthconv() {
 	} else if(CUR_SCRATCH[0] == 2) {
 		uint16_t i = CUR_SCRATCH[1];
 		uint16_t running_size = CUR_SCRATCH[2];
+		params.transpose = transpose;
 		if(i < filters) {
 			if(w->sparse.sizes[i] > 0) {
 				PRINTF("\r\n     Convolving %u %u %u",
@@ -440,6 +481,7 @@ void task_s_depthconv() {
 		transition_to(CUR_TASK);
 	}
 	if(b == NULL) {
+		params.transpose = false;
 		POP_STACK(mat_stack, 4);
 		setup_cleanup(CUR_TASK);
 		TRANSITION_TO(task_cleanup);
@@ -458,6 +500,7 @@ void task_s_depthconv() {
 			(uint8_t *)(CUR_SCRATCH + 1), sizeof(uint16_t));
 		TRANSITION_TO(task_ds_add);
 	}
+	params.transpose = false;
 	POP_STACK(mat_stack, 4);
 	setup_cleanup(CUR_TASK);
 	TRANSITION_TO(task_cleanup);
