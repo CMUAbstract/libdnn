@@ -49,7 +49,7 @@ void task_svm_mul() {
 			} else {
 				*dest_ptr++ = *inter_ptr++;
 				prof_inc("inc", 2, 2);
-				prof_inc("st", 2, 2);
+				prof_inc("st", 1, 1);
 				prof_inc("ld", 1, 1);
 			}
 			continue;
@@ -58,7 +58,7 @@ void task_svm_mul() {
 		uint16_t col_idx = filter->sparse.sizes[i] + j;
 		prof_inc("MAT_GET_1D", 1, 1);
 		fixed f = MAT_GET(filter, col_idx);
-		prof_inc("MAT_GET_1D", 1, 1);
+		prof_inc("MAT_GET_2D", 1, 1);
 		prof_inc("ld", 1, 1);
 		fixed w = MAT_GET(src, filter->sparse.offsets[col_idx], 0);
 		prof_inc("F_MUL", 1, 1);
@@ -66,11 +66,9 @@ void task_svm_mul() {
 		if(j != 0) {
 			prof_inc("F_ADD", 1, 1);
 			prof_inc("ld", 1, 1);
-			prof_inc("st", 1, 1);
 			prof_inc("inc", 1, 1);
 			w = F_ADD(*inter_ptr++, w); // Add partial
 		}
-		prof_inc("ld", 1, 1);
 		prof_inc("st", 1, 1);
 		prof_inc("inc", 1, 1);
 		*dest_ptr++ = w;
