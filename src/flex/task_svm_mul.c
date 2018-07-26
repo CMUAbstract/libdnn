@@ -34,6 +34,8 @@ void task_svm_mul() {
 	}
 
 	uint16_t j = CUR_SCRATCH[1]; // data/col index
+	prof_inc("ld", 1, 1);
+	prof_inc("MAT_GET_2D", 2, 2);
 	fixed *inter_ptr = MAT_PTR(inter, CUR_SCRATCH[0], 0);
 	fixed *dest_ptr = MAT_PTR(dest, CUR_SCRATCH[0], 0);
 	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = (++CUR_SCRATCH[0])) {

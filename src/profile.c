@@ -18,10 +18,19 @@ void prof_pulse(uint16_t length) {
 	}
 	P8OUT = 0x00;
 }
+
+void prof_on() {
+	P8DIR = 0x02;
+	P8OUT = 0x02;
+}
+
+void prof_off() {
+	P8OUT = 0x00;
+}
 #endif
 
 #if CONFIG_PROFILE == 1
-#define stats_lenGTH 0x10
+#define STATS_LENGTH 0x10
 #define STAT_NAME_LENGTH 0x10
 
 typedef struct {
@@ -32,13 +41,14 @@ typedef struct {
 
 typedef struct {
 	char name[STAT_NAME_LENGTH];
-	stat_t stats[stats_lenGTH];
+	stat_t stats[STATS_LENGTH];
 	uint16_t stats_len;
 } section_t;
 
 typedef struct {
 	section_t overall;
-	section_t sections[stats_lenGTH / 2];
+	section_t running;
+	section_t sections[STATS_LENGTH / 2];
 	uint16_t sections_len;
 } prof_t;
 
@@ -75,7 +85,7 @@ void prof_print() {
 	PRINTF("\r\n},");
 	PRINTF("\r\n\"sections\": {");
 	for(uint16_t i = 0; i < profiler.sections_len; i++) {
-		PRINTF("\r\n \"%s\": {", profiler.sections[i].name);
+		PRINTF("\r\n \"%s\": {\"idx\": 0, \"stats\": {", profiler.sections[i].name);
 		for(uint16_t j = 0; j < profiler.sections[i].stats_len; j++) {
 			PRINTF("\r\n  \"%s\": {\"invocs\": %n, \"ops\": %n}",
 				profiler.sections[i].stats[j].name, 
@@ -83,7 +93,7 @@ void prof_print() {
 				profiler.sections[i].stats[j].ops);
 			if(j != profiler.sections[i].stats_len - 1) PRINTF(",");
 		}
-		PRINTF("\r\n }");
+		PRINTF("\r\n }}");
 		if(i != profiler.sections_len - 1) PRINTF(",");
 	}
 	PRINTF("\r\n}");
@@ -103,6 +113,10 @@ void prof(prof_control_t t, char *layer) {
 					profiler.sections[0].stats[i].invocs = 
 						profiler.overall.stats[i].invocs;
 					profiler.sections[0].stats[i].ops = 
+						profiler.overall.stats[i].ops;
+					profiler.running.stats[i].invocs = 
+						profiler.overall.stats[i].invocs;
+					profiler.running.stats[i].ops = 
 						profiler.overall.stats[i].ops;
 				}
 				profiler.sections_len++;
@@ -125,10 +139,14 @@ void prof(prof_control_t t, char *layer) {
 						profiler.sections[profiler.sections_len - 1].stats[i].name);
 					profiler.sections[profiler.sections_len].stats[i].invocs = 
 						profiler.overall.stats[i].invocs - 
-						profiler.sections[profiler.sections_len - 1].stats[i].invocs;
+						profiler.running.stats[i].invocs;
 					profiler.sections[profiler.sections_len].stats[i].ops = 
 						profiler.overall.stats[i].ops - 
-						profiler.sections[profiler.sections_len - 1].stats[i].ops;
+						profiler.running.stats[i].ops;
+					profiler.running.stats[i].invocs = 
+						profiler.overall.stats[i].invocs;
+					profiler.running.stats[i].ops = 
+						profiler.overall.stats[i].ops;
 				}
 				profiler.sections_len++;
 			}

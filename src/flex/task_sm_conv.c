@@ -39,20 +39,28 @@ void task_sm_conv() {
 
 	uint16_t pos = CUR_SCRATCH[0];
 	uint16_t idx = CUR_SCRATCH[1];
+	prof_inc("ld", 2, 2);
 	bool zero = false;
 	if(pos == 0) {
 		zero = true;
 		idx += filter->sparse.offsets[pos];
+		prof_inc("add", 1, 1);
+		prof_inc("ld", 1, 1);
 	}
 	uint16_t k = idx / (fcols * frows); // Layers
 	uint16_t l = (idx % (fcols * frows)) / fcols; // Rows
 	uint16_t n = idx % fcols; // Cols
+	prof_inc("mul", 8, 8);
 
 	uint16_t i_stride = CUR_SCRATCH[3] / params.stride[1];
 	uint16_t j_stride = CUR_SCRATCH[4] / params.stride[2];
+	prof_inc("ld", 2, 2);
 	fixed f = MAT_GET(filter, pos);
+	prof_inc("MAT_GET_1D", 1, 1);
+	prof_inc("MAT_GET_2D", 2, 2);
 	fixed *inter_ptr = MAT_PTR(inter, i_stride, j_stride);
 	fixed *dest_ptr = MAT_PTR(dest, i_stride, j_stride);
+	prof_pulse(0x10);
 	for(uint16_t i = CUR_SCRATCH[3]; 
 		i < rows * params.stride[1]; i = (CUR_SCRATCH[3] += params.stride[1])) {
 		prof_inc("loop_add", 1, 1);	
@@ -74,6 +82,7 @@ void task_sm_conv() {
 				w = F_ADD(w, *inter_ptr); // Zero
 				prof_inc("ld", 1, 1);
 				prof_inc("F_ADD", 1, 1);
+				prof_inc("inc", 1, 1);
 				inter_ptr++;
 			}
 			*dest_ptr = w;
@@ -86,6 +95,9 @@ void task_sm_conv() {
 		CUR_SCRATCH[4] = 0;
 	}
 
+	prof_inc("add", 2, 2);
+	prof_inc("st", 2, 2);
+	prof_inc("ld", 1, 1);
 	scratch_bak[0] = pos + 1;
 	scratch_bak[1] = idx + filter->sparse.offsets[pos + 1];
 
@@ -104,7 +116,11 @@ void task_sm_conv() {
 	}
 	if(CUR_SCRATCH[2]) {
 		for(uint16_t i = CUR_SCRATCH[5]; i < rows; i = (++CUR_SCRATCH[5])){
+			prof_inc("loop_inc", 1, 1);
 			for(uint16_t j = CUR_SCRATCH[6]; j < cols; j = (++CUR_SCRATCH[6])){
+				prof_inc("loop_inc", 1, 1);
+				prof_inc("MAT_GET_2D", 1, 1);
+				prof_inc("MAT_SET_2D", 1, 1);
 				MAT_SET(inter, MAT_GET(dest, i, j), i, j);
 			}
 			CUR_SCRATCH[6] = 0;
