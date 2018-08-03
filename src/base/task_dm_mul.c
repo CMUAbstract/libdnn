@@ -21,6 +21,7 @@ void task_dm_mul() {
 	uint16_t rows = MAT_GET_DIM(filter, 0);
 	uint16_t cols = MAT_GET_DIM(filter, 1);
 	uint16_t dcols = MAT_GET_DIM(dest, 1);
+	prof_pulse(0x20);
 	for(uint16_t i = 0; i < rows; i++) {
 		for(uint16_t k = 0; k < dcols; k++) {
 			fixed w = 0;
@@ -31,6 +32,7 @@ void task_dm_mul() {
 			MAT_SET(dest, w, i, k);
 		}
 	}
+	prof_pulse(0x20);
 	POP_STACK(mat_stack, 3);
 	setup_cleanup(CUR_TASK);
 	TRANSITION_TO(task_cleanup);

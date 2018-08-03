@@ -35,6 +35,7 @@ void task_dm_mul() {
 	}
 
 	uint16_t k = CUR_SCRATCH[2];
+	prof_pulse(0x20);
 	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = ++CUR_SCRATCH[0]) {
 		prof_inc("loop_inc", 1, 1);
 		for(uint16_t j = CUR_SCRATCH[1]; j < dcols; j = ++CUR_SCRATCH[1]) {
@@ -46,11 +47,13 @@ void task_dm_mul() {
 			if(k > 0) {
 				w = F_ADD(w, MAT_GET(inter, i, j));
 				prof_inc("F_ADD", 1, 1);
+				prof_inc("MAT_GET_2D", 1, 1);
 			}
 			MAT_SET(dest, w, i, j);
 		}
 		CUR_SCRATCH[1] = 0;
 	}
+	prof_pulse(0x20);
 
 	scratch_bak[0] = 0;
 	scratch_bak[2] = k + 1;

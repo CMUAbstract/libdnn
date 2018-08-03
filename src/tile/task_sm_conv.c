@@ -54,6 +54,7 @@ void task_sm_conv() {
 		init_j += (params.stride[2] - (tile_size_x % params.stride[2]));
 	uint16_t i_stride = init_i / params.stride[1];
 	uint16_t j_stride = init_j / params.stride[2];
+	prof_pulse(0x1);
 	for(uint16_t i = init_i; 
 		i < CUR_SCRATCH[2] + tile_size_y; i += params.stride[1]){
 		for(uint16_t j = init_j; 
@@ -75,6 +76,7 @@ void task_sm_conv() {
 		j_stride = init_j / params.stride[2];
 		i_stride++;
 	}
+	prof_pulse(0x1);
 
 	scratch_bak[0] = pos;
 	scratch_bak[1] = idx;

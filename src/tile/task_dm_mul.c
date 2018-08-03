@@ -31,6 +31,7 @@ void task_dm_mul() {
 
 	MAT_RESHAPE(inter, tile_size_y, tile_size_x);
 
+	prof_pulse(0x20);
 	for(uint16_t i = 0; i < tile_size_y; i++) {
 		uint16_t idx_i = CUR_SCRATCH[0] + i;
 		for(uint16_t k = 0; k < tile_size_y; k++) {
@@ -50,6 +51,7 @@ void task_dm_mul() {
 				(uint8_t *)(dest->data + where), sizeof(fixed));
 		}
 	}
+	prof_pulse(0x20);
 
 	uint16_t i = CUR_SCRATCH[0];
 	uint16_t j = CUR_SCRATCH[1];

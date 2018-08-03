@@ -14,6 +14,7 @@
 TASK(TASK_UID_BLAS_OFFSET + 9, task_svm_mul);
 
 // Sparse vector-matrix multiplication
+#if 0
 void task_svm_mul() {
 	mat_t *src = PEEK_STACK(mat_stack, 0);
 	mat_t *dest = PEEK_STACK(mat_stack, 1);
@@ -44,3 +45,34 @@ void task_svm_mul() {
 	setup_cleanup(CUR_TASK);
 	TRANSITION_TO(task_cleanup);
 }
+
+#else
+void task_svm_mul() {
+	mat_t *src = PEEK_STACK(mat_stack, 0);
+	mat_t *dest = PEEK_STACK(mat_stack, 1);
+	mat_t *filter = PEEK_STACK(mat_stack, 2);
+
+	uint16_t rows = MAT_GET_DIM(dest, 0);
+	prof_pulse(0x10);
+	for(uint16_t i = 0; i < rows; i++) {
+		uint16_t start = filter->sparse.sizes[i];
+		uint16_t end = filter->sparse.sizes[i + 1];
+		fixed *filter_ptr = MAT_PTR(filter, start);
+		fixed *dest_ptr = MAT_PTR(dest, i, 0);
+		uint16_t *offset = filter->sparse.offsets + start;
+		for(uint16_t j = start; j < end; j++) {
+			fixed w = F_MUL(MAT_GET(src, *offset, 0), *filter_ptr++);
+			if(j != start) {
+				w = F_ADD(w, *dest_ptr);
+			}
+			*dest_ptr = w;
+			offset++;
+		}
+		dest_ptr++;
+	}
+	prof_pulse(0x10);
+	POP_STACK(mat_stack, 3);
+	setup_cleanup(CUR_TASK);
+	TRANSITION_TO(task_cleanup);
+}
+#endif

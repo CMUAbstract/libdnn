@@ -31,6 +31,7 @@ void task_svm_mul() {
 
 	uint16_t cur_row = CUR_SCRATCH[0]; // row
 	uint16_t j = CUR_SCRATCH[1]; // data/col index
+	prof_pulse(0x10);
 	for(uint16_t i = cur_row; i < cur_row + tile_size; i++) {
 		if(j >= (filter->sparse.sizes[i + 1] - filter->sparse.sizes[i])) {
 			if(j == 0) MAT_SET(dest, F_LIT(0), i, 0); // Empty row
@@ -48,6 +49,7 @@ void task_svm_mul() {
 		write_to_gbuf((uint8_t *)(inter->data + i), 
 			(uint8_t *)(dest->data + i), sizeof(fixed));
 	}
+	prof_pulse(0x10);
 
 	scratch_bak[0] = cur_row + tile_size;
 	if(cur_row + tile_size == rows) {

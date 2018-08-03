@@ -28,6 +28,7 @@ void task_sm_conv() {
 	uint16_t idx = 0;
 	uint16_t pos = 0;
 	char zero = 1;
+	prof_pulse(0x1);
 	while(pos < total_elements) {
 		idx += filter->sparse.offsets[pos];
 		uint16_t k = idx / (fcols * frows); // Layers
@@ -56,6 +57,7 @@ void task_sm_conv() {
 		zero = 0;
 		pos++;
 	}
+	prof_pulse(0x1);
 	POP_STACK(mat_stack, 3);
 	setup_cleanup(CUR_TASK);
 	TRANSITION_TO(task_cleanup);

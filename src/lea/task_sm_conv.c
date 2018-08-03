@@ -141,22 +141,28 @@ void task_sm_conv() {
 	}
 	uint16_t pos = CUR_SCRATCH[0];
 	uint16_t idx = CUR_SCRATCH[1];
+	prof_inc("ld", 2, 2);
 
 	uint16_t k = idx / (fcols * frows); // Layers
 	uint16_t l = (idx % (fcols * frows)) / fcols; // Rows
 	uint16_t n = idx % fcols; // Cols
+	prof_inc("mul", 4, 4);
 	uint16_t filter_tile_size = greatest_tile_size(fcols, tile_size);
 	if(n + filter_tile_size >= fcols) filter_tile_size = fcols - n;
+	prof_inc("add", 2, 2);
 	uint16_t filter_length = filter_tile_size + (filter_tile_size & 0x01);
 
 	uint16_t common_tile_size = greatest_tile_size(scols, tile_size);
 	uint16_t common_rows = tile_size / (scols + filter_length);
+	prof_inc("mul", 1, 1);
+	prof_inc("add", 1, 1);
 	if(common_rows == 0) common_rows = 1;
 	else if(common_rows > rows) common_rows = srows;
 	uint16_t common_cols = common_tile_size; 
 	uint16_t dcommon_cols = common_cols;
 	if(dcommon_cols > dcols) dcommon_cols = dcols;
 	common_tile_size *= common_rows;
+	prof_inc("mul", 1, 1);
 
 // PRINTF("\r\n rows: %u cols: %u common_rows: %u common_cols: %u dcommon_cols: %u, frows: %u fcols: %u filter_tile_size: %u", 
 // 	rows, cols, common_rows, common_cols, dcommon_cols, frows, fcols, filter_tile_size);
@@ -165,15 +171,22 @@ void task_sm_conv() {
 	if(!CUR_SCRATCH[2]) {
 		if(pos == 0) idx += filter->sparse.offsets[pos];
 		uint16_t f = idx % filter_tile_size;
+		prof_inc("ld", 2, 2);
+		prof_inc("mul", 1, 1);
 		while(pos < total_elements && 
 			f < filter_tile_size) {
 			coalesced_filter[f] = MAT_GET(filter, pos);
+			prof_inc("MAT_GET_1D", 1, 1);
 			pos++;
 			f += filter->sparse.offsets[pos];
 			idx += filter->sparse.offsets[pos];
+			prof_inc("inc", 1, 1);
+			prof_inc("add", 2, 2);
+			prof_inc("ld", 2, 2);
 		}
 		scratch_bak[0] = pos;
 		scratch_bak[1] = idx;
+		prof_inc("st", 2, 2);
 		scratch_bak[2] = 1;
 		write_to_gbuf((uint8_t *)(scratch_bak + 2), 
 			(uint8_t *)(CUR_SCRATCH + 2), sizeof(uint16_t));
@@ -189,14 +202,23 @@ void task_sm_conv() {
 	msp_mac_q15_params params_mac;	
 
 	for(uint16_t i = 0; i < filter_length; i++) {
+		prof_inc("inc", 1, 1);
 		if((filter_tile_size & 0x01) && i == filter_length - 1) {
 			tsrc1[filter_length - i - 1] = 0;
+			prof_inc("st", 1, 1);
+			prof_inc("add", 1, 1);
 			continue;
 		}
 		if(dcols == 1) {
 			tsrc1[filter_length - i - 1] = coalesced_filter[i];
+			prof_inc("ld", 1, 1);
+			prof_inc("st", 1, 1);
+			prof_inc("add", 1, 1);
 			continue;
 		}
+		prof_inc("st", 1, 1);
+		prof_inc("ld", 1, 1);
+		prof_inc("add", 1, 1);
 		tsrc1[filter_length - i - 1] = coalesced_filter[i] << (SHIFT + 1);
 		// tsrc1[filter_length - i - 1] = coalesced_filter[i] << SHIFT;
 	}
@@ -204,14 +226,19 @@ void task_sm_conv() {
 	// for(uint16_t i = 0; i < filter_length; i++) {
 	// 	PRINTF("%i ", tsrc1[i]);
 	// }
+	prof_pulse(0x1);
 	uint16_t row_step = common_rows;
 	for(uint16_t i = CUR_SCRATCH[4]; i < drows; 
 		i = (CUR_SCRATCH[4] += row_step)) {
+		prof_inc("loop_add", 1, 1);
 		for(uint16_t j = CUR_SCRATCH[5]; j < dcols; 
 			j = (CUR_SCRATCH[5] += dcommon_cols)) {
+			prof_inc("loop_add", 1, 1);
 			params_fir.length = common_tile_size + row_step * filter_length;
 			params_fir.length += params_fir.length & 0x01;
 			params_add.length = params_fir.length;
+			prof_inc("add", 2, 2);
+			prof_inc("mul", 1, 1);
 			// common_cols should be based on source dimensions
 			for(uint16_t g = 0; g < row_step; g++) {
 				if(common_cols > 12 DMA_ENABLE) { // Load activation tile
@@ -225,10 +252,18 @@ void task_sm_conv() {
 				    	DMA_DIRECTION_INCREMENT);
 					DMA_enableTransfers(dma_config.channelSelect);
 				    DMA_startSleepTransfer(dma_config.channelSelect);
+				    prof_inc("DMA", 1, common_cols);
+				    prof_inc("MAT_GET_3D", 1, 1);
+				    prof_inc("add", 4, 4);
+				    prof_inc("mul", 1, 1);
 				} else {
 					memcpy(tsrc2 + g * (common_cols + filter_length), 
 						MAT_PTR(src, k, i + l + g, j + n), 
-						sizeof(fixed) * common_cols);	
+						sizeof(fixed) * common_cols);
+					prof_inc("ld", common_cols, common_cols);
+					prof_inc("MAT_GET_3D", 1, 1);
+					prof_inc("add", 4, 4);
+				    prof_inc("mul", 1, 1);	
 				}
 			}
 			if(cols == 1) {
@@ -238,9 +273,13 @@ void task_sm_conv() {
 					fixed *tdest = tdest1 + ptr_offset;
 					status = msp_mac_q15(&params_mac, tsrc1, 
 						tsrc2 + ptr_offset, tdest);
+					prof_inc("LEA_MAC", 1, params_mac.length);
 					*tdest = ((*tdest >> 1) + F_K) >> F_N;
+					prof_inc("add", 1, 1);
+					prof_inc("st", 1, 1);
 				}
 			} else {
+				prof_inc("LEA_FIR", 1, params_fir.length * params_fir.tapLength);
 				status = msp_fir_q15(&params_fir, tsrc2, tdest1);
 				msp_checkStatus(status);
 			}
@@ -249,6 +288,7 @@ void task_sm_conv() {
 			// common_cols should be based on dest dimensions
 			if(k == 0 && l == 0 && n == 0) { // Zero
 				for(uint16_t g = 0; g < row_step; g++) {
+					prof_inc("inc", 1, 1);
 					if(common_cols > 12 DMA_ENABLE) {
 						DMA_setTransferSize(dma_config.channelSelect, 
 							dcommon_cols);
@@ -260,10 +300,18 @@ void task_sm_conv() {
 					    	DMA_DIRECTION_INCREMENT);
 						DMA_enableTransfers(dma_config.channelSelect);
 					    DMA_startSleepTransfer(dma_config.channelSelect);
+					    prof_inc("add", 2, 2);
+					    prof_inc("mul", 1, 1);
+					    prof_inc("MAT_GET_2D", 1, 1);
+					    prof_inc("DMA", 1, dcommon_cols);
 					} else {
 						memcpy(MAT_PTR(inter2, i + g, j), 
 							tdest1 + g * (common_cols + filter_length), 
-							sizeof(fixed) * dcommon_cols);	
+							sizeof(fixed) * dcommon_cols);
+						prof_inc("add", 2, 2);
+					    prof_inc("mul", 1, 1);
+					    prof_inc("MAT_GET_2D", 1, 1);
+					    prof_inc("ld", dcommon_cols, dcommon_cols);
 					}
 				}
 				continue;
@@ -280,12 +328,21 @@ void task_sm_conv() {
 				    	DMA_DIRECTION_INCREMENT);
 					DMA_enableTransfers(dma_config.channelSelect);
 				    DMA_startSleepTransfer(dma_config.channelSelect);
+				    prof_inc("add", 2, 2);
+				    prof_inc("mul", 1, 1);
+				    prof_inc("MAT_GET_2D", 1, 1);
+				    prof_inc("DMA", 1, dcommon_cols);
 				} else {
 					memcpy(tsrc2 + g * (common_cols + filter_length), 
 						MAT_PTR(inter1, i + g, j), 
-						sizeof(fixed) * dcommon_cols);	
+						sizeof(fixed) * dcommon_cols);
+					prof_inc("add", 2, 2);
+				    prof_inc("mul", 1, 1);
+				    prof_inc("MAT_GET_2D", 1, 1);
+				    prof_inc("ld", dcommon_cols, dcommon_cols);
 				}
 			}
+			prof_inc("LEA_ADD", 1, params_add.length);
 			status = msp_add_q15(&params_add, tdest1, tsrc2, tdest2);
 			msp_checkStatus(status);
 			for(uint16_t g = 0; g < row_step; g++) {
@@ -299,18 +356,29 @@ void task_sm_conv() {
 				    	DMA_DIRECTION_INCREMENT);
 					DMA_enableTransfers(dma_config.channelSelect);
 				    DMA_startSleepTransfer(dma_config.channelSelect);
+				    prof_inc("add", 2, 2);
+				    prof_inc("mul", 1, 1);
+				    prof_inc("MAT_GET_2D", 1, 1);
+				    prof_inc("DMA", 1, dcommon_cols);
 				} else {
 					memcpy(MAT_PTR(inter2, i + g, j), 
 						tdest2 + g * (common_cols + filter_length), 
 						sizeof(fixed) * dcommon_cols);
+					prof_inc("add", 2, 2);
+				    prof_inc("mul", 1, 1);
+				    prof_inc("MAT_GET_2D", 1, 1);
+				    prof_inc("ld", dcommon_cols, dcommon_cols);
 				}
 			}
 		}
+		prof_inc("add", 1, 1);
 		if(i + common_rows >= rows) {
+			prof_inc("add", 1, 1);
 			row_step = drows - i;
 		}
 		CUR_SCRATCH[5] = 0;
 	}
+	prof_pulse(0x1);
 	scratch_bak[3] = CUR_SCRATCH[3] ^ 0x01;
 	scratch_bak[4] = 0;
 	write_to_gbuf((uint8_t *)(scratch_bak), 
@@ -332,7 +400,11 @@ void task_sm_conv() {
 
 	if(CUR_SCRATCH[3]) {
 		for(uint16_t i = CUR_SCRATCH[6]; i < rows; i = (++CUR_SCRATCH[6])){
+			prof_inc("loop_inc", 1, 1);	
 			for(uint16_t j = CUR_SCRATCH[7]; j < cols; j = (++CUR_SCRATCH[7])){
+				prof_inc("loop_inc", 1, 1);
+				prof_inc("MAT_GET_2D", 1, 1);
+				prof_inc("MAT_SET_2D", 1, 1);
 				MAT_SET(inter1, MAT_GET(inter2, i, j), i, j);
 			}
 			CUR_SCRATCH[7] = 0;
@@ -342,15 +414,21 @@ void task_sm_conv() {
 	uint16_t j_stride = CUR_SCRATCH[9] / params.stride[2];
 	for(uint16_t i = CUR_SCRATCH[8]; i < rows; 
 		i = (CUR_SCRATCH[8] += params.stride[1])){
+		prof_inc("loop_inc", 1, 1);
 		for(uint16_t j = CUR_SCRATCH[9]; j < cols; 
 			j = (CUR_SCRATCH[9] += params.stride[2])){
+			prof_inc("loop_inc", 1, 1);
 			if(params.transpose) {
 				MAT_SET(dest, MAT_GET(inter2, i, j), j_stride, i_stride);
 			} else {
 				MAT_SET(dest, MAT_GET(inter2, i, j), i_stride, j_stride);
 			}
+			prof_inc("MAT_GET_2D", 1, 1);
+			prof_inc("MAT_SET_2D", 1, 1);
+			prof_inc("inc", 1, 1);
 			j_stride++;
 		}
+		prof_inc("inc", 1, 1);
 		i_stride++;
 		j_stride = 0;
 		CUR_SCRATCH[9] = 0;

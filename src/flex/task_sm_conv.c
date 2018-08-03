@@ -50,17 +50,17 @@ void task_sm_conv() {
 	uint16_t k = idx / (fcols * frows); // Layers
 	uint16_t l = (idx % (fcols * frows)) / fcols; // Rows
 	uint16_t n = idx % fcols; // Cols
-	prof_inc("mul", 8, 8);
+	prof_inc("mul", 6, 6);
 
 	uint16_t i_stride = CUR_SCRATCH[3] / params.stride[1];
 	uint16_t j_stride = CUR_SCRATCH[4] / params.stride[2];
-	prof_inc("ld", 2, 2);
+	prof_inc("ld", 4, 4);
 	fixed f = MAT_GET(filter, pos);
 	prof_inc("MAT_GET_1D", 1, 1);
 	prof_inc("MAT_GET_2D", 2, 2);
 	fixed *inter_ptr = MAT_PTR(inter, i_stride, j_stride);
 	fixed *dest_ptr = MAT_PTR(dest, i_stride, j_stride);
-	prof_pulse(0x10);
+	prof_pulse(0x1);
 	for(uint16_t i = CUR_SCRATCH[3]; 
 		i < rows * params.stride[1]; i = (CUR_SCRATCH[3] += params.stride[1])) {
 		prof_inc("loop_add", 1, 1);	
@@ -94,6 +94,7 @@ void task_sm_conv() {
 		}
 		CUR_SCRATCH[4] = 0;
 	}
+	prof_pulse(0x1);
 
 	prof_inc("add", 2, 2);
 	prof_inc("st", 2, 2);

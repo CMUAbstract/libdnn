@@ -57,7 +57,9 @@ void task_dm_mul() {
 		inter = tmp;
 	}
 
+	prof_pulse(0x20);
 	for(uint16_t i = CUR_SCRATCH[0]; i < rows; i = ++CUR_SCRATCH[0]) {
+		prof_inc("loop_inc", 1, 1);
 		if(common_tile_size > 12 DMA_ENABLE) { // Load filter tile
 			DMA_setTransferSize(dma_config.channelSelect, common_tile_size);
 		    DMA_setSrcAddress(dma_config.channelSelect, 
@@ -66,10 +68,15 @@ void task_dm_mul() {
 				DMA_DIRECTION_INCREMENT);
 		    DMA_enableTransfers(dma_config.channelSelect);
 		    DMA_startSleepTransfer(dma_config.channelSelect);
+		    prof_inc("MAT_GET_2D", 1, 1);
+		    prof_inc("DMA", 1, common_tile_size);
 		} else {
 			memcpy(tsrc1, MAT_PTR(filter, i, k), sizeof(fixed) * common_tile_size);	
+			prof_inc("MAT_GET_2D", 1, 1);
+		    prof_inc("ld", common_tile_size, common_tile_size);
 		}
 		for(uint16_t j = CUR_SCRATCH[1]; j < dcols; j = ++CUR_SCRATCH[1]) {
+			prof_inc("loop_inc", 1, 1);
 			if(common_tile_size > 12 DMA_ENABLE) { // Load activation tile
 				DMA_setTransferSize(dma_config.channelSelect, common_tile_size);
 			    DMA_setSrcAddress(dma_config.channelSelect, 
@@ -78,24 +85,35 @@ void task_dm_mul() {
 					DMA_DIRECTION_INCREMENT);
 				DMA_enableTransfers(dma_config.channelSelect);
 			    DMA_startSleepTransfer(dma_config.channelSelect);
+			    prof_inc("MAT_GET_2D", 1, 1);
+			    prof_inc("DMA", 1, common_tile_size);
 			} else {
 				memcpy(tsrc2, MAT_PTR(src, k, j), 
-					sizeof(fixed) * common_tile_size);	
+					sizeof(fixed) * common_tile_size);
+				prof_inc("MAT_GET_2D", 1, 1);
+			    prof_inc("ld", common_tile_size, common_tile_size);	
 			}
 			// Do dot product here
+			prof_inc("LEA_MAC", 1, params.length);
 			status = msp_mac_q15(&params, tsrc1, tsrc2, tdest1);
 			msp_checkStatus(status);
 			fixed w = ((*tdest1 >> 1) + F_K) >> F_N;
+			prof_inc("add", 1, 1);
+			prof_inc("st", 1, 1);
 			// fixed w = *tdest1 >> 1;
 			// PRINTF("\r\n i: %u j: %u k: %u filter: %i src: %i tsrc1: %i tsrc2: %i dest: %i", 
 				// i, j, k, *MAT_PTR(filter, i, k), *MAT_PTR(src, k, j), tsrc1[0], tsrc2[0], w);
 			if(k > 0) {
+				prof_inc("F_ADD", 1, 1);
+				prof_inc("MAT_GET_2D", 1, 1);
 				w = F_ADD(w, MAT_GET(dest, i, j));
 			}
+			prof_inc("MAT_SET_2D", 1, 1);
 			MAT_SET(dest, w, i, j);
 		}
 		CUR_SCRATCH[1] = 0;
 	}
+	prof_pulse(0x20);
 
 	scratch_bak[0] = 0;
 	// Inc by tile size
