@@ -13,7 +13,6 @@
 #include "buffer.h"
 #include "misc.h"
 #include "cleanup.h"
-#include "profile.h"
 
 static __fram mat_t m = {.data = LAYER_BUFFER(0)};
 static __fram mat_t *inter = &m;
@@ -606,16 +605,10 @@ void task_s_conv() {
 	mat_t *w= PEEK_STACK(mat_stack, 2);
 	mat_t *b = PEEK_STACK(mat_stack, 3);
 	mat_reshape(inter, dest->dims, dest->len_dims);
-	prof_inc("st", 3, 3);
-	prof_inc("ld", 3, 3);
-	prof_inc("mul", 2, 2);	
 	uint16_t filters = w->sparse.dims[0];
-	prof_inc("ld", 1, 1);
 	if(CUR_SCRATCH[0] == 0) { // Sparse Convolve
 		uint16_t i = CUR_SCRATCH[1];
-		prof_inc("ld", 1, 1);
 		uint16_t running_size = CUR_SCRATCH[2];
-		prof_inc("ld", 1, 1);
 		if(i < filters) {
 			if(w->sparse.sizes[i] > 0) {
 				PRINTF("\r\n     Convolving %u %u %u",
@@ -623,27 +616,10 @@ void task_s_conv() {
 				TASK_REF(task_sm_conv)->info.return_task = CUR_TASK;
 				// Assumes filter, dest, src in that order
 				c_filter = MAT_CONSTRAIN(w, running_size);
-				prof_inc("st", 5, 5);
-				prof_inc("ld", 5, 5);
-				prof_inc("st", 8, 8);
-				prof_inc("ld", 6, 6);
-				prof_inc("add", 6, 6);
-				prof_inc("mul", 1, 1);
 				c_filter.dims[0] = w->sparse.sizes[i];
 				c_filter.sparse.len_dims = w->sparse.len_dims - 1;
-				prof_inc("ld", 2, 2);
-				prof_inc("st", 2, 2);
 				c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
-				prof_inc("st", 5, 5);
-				prof_inc("ld", 5, 5);
-				prof_inc("st", 8, 8);
-				prof_inc("ld", 6, 6);
-				prof_inc("add", 6, 6);
-				prof_inc("mul", 1, 1);
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, src);
-				prof_inc("inc", 1, 1);
-				prof_inc("add", 1, 1);
-				prof_inc("ld", 1, 1);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
 				write_to_gbuf((uint8_t *)(scratch_bak + 1), 
@@ -701,16 +677,10 @@ void task_s_depthconv() {
 	mat_t *w= PEEK_STACK(mat_stack, 2);
 	mat_t *b = PEEK_STACK(mat_stack, 3);
 	mat_reshape(inter, dest->dims, dest->len_dims);
-	prof_inc("st", 3, 3);
-	prof_inc("ld", 3, 3);
-	prof_inc("mul", 2, 2);	
 	uint16_t filters = w->sparse.dims[0];
-	prof_inc("ld", 1, 1);
 	if(CUR_SCRATCH[0] == 0) { // Sparse Convolve
 		uint16_t i = CUR_SCRATCH[1];
-		prof_inc("ld", 1, 1);
 		uint16_t running_size = CUR_SCRATCH[2];
-		prof_inc("ld", 1, 1);
 		if(i < filters) {
 			if(w->sparse.sizes[i] > 0) {
 				PRINTF("\r\n     Convolving %u %u %u",
@@ -718,38 +688,12 @@ void task_s_depthconv() {
 				TASK_REF(task_sm_conv)->info.return_task = CUR_TASK;
 				// Assumes filter, dest, src in that order
 				c_filter = MAT_CONSTRAIN(w, running_size);
-				prof_inc("st", 5, 5);
-				prof_inc("ld", 5, 5);
-				prof_inc("st", 8, 8);
-				prof_inc("ld", 6, 6);
-				prof_inc("add", 6, 6);
-				prof_inc("mul", 1, 1);
 				c_filter.dims[0] = w->sparse.sizes[i];
 				c_filter.sparse.len_dims = w->sparse.len_dims - 1;
-				prof_inc("ld", 2, 2);
-				prof_inc("st", 2, 2);
 				c_inter = (b == NULL) ? MAT_CONSTRAIN(dest, i) :  MAT_CONSTRAIN(inter, i);
-				prof_inc("st", 5, 5);
-				prof_inc("ld", 5, 5);
-				prof_inc("st", 8, 8);
-				prof_inc("ld", 6, 6);
-				prof_inc("add", 6, 6);
-				prof_inc("mul", 1, 1);
 				c_src = MAT_CONSTRAIN(src, i);
-				prof_inc("st", 5, 5);
-				prof_inc("ld", 5, 5);
-				prof_inc("st", 8, 8);
-				prof_inc("ld", 6, 6);
-				prof_inc("add", 6, 6);
-				prof_inc("mul", 1, 1);
 				MAT_RESHAPE(c_src_ptr, 1, MAT_GET_DIM(src, 1), MAT_GET_DIM(src, 2));
-				prof_inc("st", 3, 3);
-				prof_inc("ld", 3, 3);
-				prof_inc("mul", 2, 2);	
 				PUSH_STACK(mat_stack, c_filter_ptr, c_inter_ptr, c_src_ptr);
-				prof_inc("inc", 1, 1);
-				prof_inc("add", 1, 1);
-				prof_inc("ld", 1, 1);
 				scratch_bak[1] = i + 1;
 				scratch_bak[2] = running_size + w->sparse.sizes[i];
 				write_to_gbuf((uint8_t *)(scratch_bak + 1), 
